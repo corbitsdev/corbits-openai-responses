@@ -101,7 +101,7 @@ describe("Responses adapter — block-index lifecycle", () => {
 describe("Responses adapter — protocol-native defaults", () => {
   test("stream:false requests accept application/json, not text/event-stream", () => {
     const adapter = createOpenAIResponsesAdapter(source, { stream: false });
-    const request = adapter.buildRequest(turns, "gpt-x", {});
+    const request = adapter.buildRequest(turns, "model", {});
     expect(bodyOf(request)["stream"]).toBe(false);
     expect(request.headers["accept"]).toBe("application/json");
   });
@@ -143,7 +143,7 @@ describe("Responses adapter — protocol-native defaults", () => {
 describe("Responses parser — event schema validation", () => {
   test("a function_call output_item.added missing id throws rather than silently dropping the start", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
-    adapter.buildRequest(turns, "gpt-x", {});
+    adapter.buildRequest(turns, "model", {});
     const added = JSON.stringify({
       type: "response.output_item.added",
       item: { type: "function_call", call_id: "call_1", name: "shell" },
@@ -156,7 +156,7 @@ describe("Responses parser — event schema validation", () => {
   // protocol mismatch, not a block silently skipped.
   test("output_item.added reasoning item missing id throws instead of skipping registration", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
-    adapter.buildRequest(turns, "gpt-x", {});
+    adapter.buildRequest(turns, "model", {});
     const added = JSON.stringify({
       type: "response.output_item.added",
       item: { type: "reasoning" },
@@ -169,7 +169,7 @@ describe("Responses parser — event schema validation", () => {
   // ciphertext lost with no error raised anywhere.
   test("output_item.done reasoning with encrypted_content but no id throws instead of dropping the signature", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
-    adapter.buildRequest(turns, "gpt-x", {});
+    adapter.buildRequest(turns, "model", {});
     const done = JSON.stringify({
       type: "response.output_item.done",
       item: { type: "reasoning", encrypted_content: "CIPHER" },
@@ -182,7 +182,7 @@ describe("Responses parser — event schema validation", () => {
   // ciphertext forward, so it must throw rather than silently doing nothing.
   test("output_item.done reasoning with neither id nor encrypted_content throws instead of being skipped", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
-    adapter.buildRequest(turns, "gpt-x", {});
+    adapter.buildRequest(turns, "model", {});
     const done = JSON.stringify({
       type: "response.output_item.done",
       item: { type: "reasoning" },
@@ -196,7 +196,7 @@ describe("Responses parser — event schema validation", () => {
   // is protocol-legal to skip.
   test("an SSE payload with no `type` field throws a protocol mismatch instead of being ignored", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
-    adapter.buildRequest(turns, "gpt-x", {});
+    adapter.buildRequest(turns, "model", {});
     expect(() =>
       adapter.parseResponse(JSON.stringify({ item_id: "x", delta: "hi" })),
     ).toThrow(ProtocolMismatchError);
@@ -207,7 +207,7 @@ describe("Responses parser — event schema validation", () => {
 
   test("output_item.added function_call with an empty-string id is a protocol mismatch, not accepted", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
-    adapter.buildRequest(turns, "gpt-x", {});
+    adapter.buildRequest(turns, "model", {});
     const added = JSON.stringify({
       type: "response.output_item.added",
       item: { type: "function_call", id: "", call_id: "", name: "" },
@@ -217,7 +217,7 @@ describe("Responses parser — event schema validation", () => {
 
   test("ignores an unrecognized but well-formed event type rather than throwing", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
-    adapter.buildRequest(turns, "gpt-x", {});
+    adapter.buildRequest(turns, "model", {});
     expect(
       adapter.parseResponse(
         JSON.stringify({ type: "response.some_future_event" }),
@@ -231,7 +231,7 @@ describe("Responses parser — event schema validation", () => {
   // synthesize silently.
   test("a function_call_arguments.delta for an item_id never announced by output_item.added throws", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
-    adapter.buildRequest(turns, "gpt-x", {});
+    adapter.buildRequest(turns, "model", {});
     const orphanDelta = JSON.stringify({
       type: "response.function_call_arguments.delta",
       item_id: "never_announced",
