@@ -359,3 +359,201 @@ describe("responsesAdapterFactory — hooks composition", () => {
     );
   });
 });
+
+describe("Responses parser — usage mapping", () => {
+  type UsageEvent = Extract<InferenceEvent, { type: "inference.usage" }>;
+
+  // Narrow the emitted `inference.usage` event, following this file's
+  // pickFirst* pattern: exhaust failure modes with a descriptive throw.
+  function usageEventOf(events: InferenceEvent[]): UsageEvent {
+    const event = events.find(
+      (e): e is UsageEvent => e.type === "inference.usage",
+    );
+    if (event === undefined)
+      throw new Error("expected an inference.usage event");
+    return event;
+  }
+
+  // The `response.completed` handler reads no request-scoped state, so no
+  // buildRequest priming is needed — usage mapping starts from a fresh
+  // adapter every time.
+  function usageFromCompleted(usage: unknown): UsageEvent["data"]["usage"] {
+    const adapter = createOpenAIResponsesAdapter(source, {});
+    const events = adapter.parseResponse(
+      JSON.stringify({ type: "response.completed", response: { usage } }),
+    );
+    return usageEventOf(events).data.usage;
+  }
+
+  // OpenAI (GPT-5.6+) documents `cache_write_tokens` as a subset of
+  // `input_tokens` — the docs' worked example is 2600 input = 2000 read +
+  // 400 written + 200 ordinary. Both subsets must be split out of `input`
+  // or the summed TokenUsage fields double-count them.
+  test("OpenAI-shaped usage splits cache_write_tokens out of input", () => {
+    const usage = usageFromCompleted({
+      input_tokens: 2600,
+      output_tokens: 10,
+      input_tokens_details: { cached_tokens: 2000, cache_write_tokens: 400 },
+      output_tokens_details: { reasoning_tokens: 0 },
+    });
+    expect(usage).toEqual({
+      input: 200,
+      output: 10,
+      cacheRead: 2000,
+      cacheWrite: 400,
+      thinking: 0,
+    });
+  });
+
+  // A gateway fronting an OpenAI-shaped endpoint reports the
+  // Anthropic-shaped `cache_creation_tokens`, whose subset relationship to
+  // `input_tokens` is unobservable from the client; that path keeps the
+  // historic behavior of not reducing input.
+  test("gateway-shaped cache_creation_tokens maps to cacheWrite without reducing input", () => {
+    const usage = usageFromCompleted({
+      input_tokens: 1000,
+      input_tokens_details: { cached_tokens: 100, cache_creation_tokens: 50 },
+    });
+    expect(usage.cacheWrite).toBe(50);
+    expect(usage.cacheRead).toBe(100);
+    expect(usage.input).toBe(900);
+  });
+
+  test("usage without a cache-write field reports cacheWrite zero", () => {
+    const usage = usageFromCompleted({
+      input_tokens: 500,
+      input_tokens_details: { cached_tokens: 500 },
+    });
+    expect(usage.cacheWrite).toBe(0);
+    expect(usage.cacheRead).toBe(500);
+    expect(usage.input).toBe(0);
+  });
+
+  // When both field names appear, the OpenAI-native one wins for both the
+  // reported value and the input subtraction — the two are one linkage,
+  // not independent choices.
+  test("both write fields present prefers cache_write_tokens for value and input split", () => {
+    const usage = usageFromCompleted({
+      input_tokens: 2600,
+      input_tokens_details: {
+        cached_tokens: 2000,
+        cache_write_tokens: 400,
+        cache_creation_tokens: 999,
+      },
+    });
+    expect(usage.cacheWrite).toBe(400);
+    expect(usage.input).toBe(200);
+  });
+
+  // An explicit zero is a real reported value, not an omission: the
+  // preference chain is nullish (`??`), so `cache_write_tokens: 0` must
+  // suppress the `cache_creation_tokens` fallback rather than fall through
+  // to it (a rewrite to `||` would silently report the fallback instead).
+  test("explicit cache_write_tokens zero wins over a nonzero cache_creation_tokens", () => {
+    const usage = usageFromCompleted({
+      input_tokens: 100,
+      input_tokens_details: {
+        cache_write_tokens: 0,
+        cache_creation_tokens: 77,
+      },
+    });
+    expect(usage).toEqual({
+      input: 100,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      thinking: 0,
+    });
+  });
+
+  // A backend reporting subset counts larger than the total must clamp at
+  // zero rather than emit a negative input that corrupts downstream sums.
+  test("write tokens exceeding input clamp input at zero, not negative", () => {
+    const usage = usageFromCompleted({
+      input_tokens: 300,
+      input_tokens_details: { cached_tokens: 100, cache_write_tokens: 400 },
+    });
+    expect(usage).toEqual({
+      input: 0,
+      output: 0,
+      cacheRead: 100,
+      cacheWrite: 400,
+      thinking: 0,
+    });
+  });
+
+  // The schema accepts the whole details object as null (the SSE envelope's
+  // own convention), which must behave like an absent object.
+  test("null input_tokens_details yields zero cache fields with input preserved", () => {
+    const usage = usageFromCompleted({
+      input_tokens: 250,
+      output_tokens: 5,
+      input_tokens_details: null,
+    });
+    expect(usage).toEqual({
+      input: 250,
+      output: 5,
+      cacheRead: 0,
+      cacheWrite: 0,
+      thinking: 0,
+    });
+  });
+
+  // A completed frame may carry `usage: null`; the zeroed event must still
+  // be emitted so downstream usage accounting sees the turn.
+  test("null usage emits a zeroed usage event", () => {
+    const usage = usageFromCompleted(null);
+    expect(usage).toEqual({
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      thinking: 0,
+    });
+  });
+
+  // All five counters populated at once: each TokenUsage field must come
+  // from its own wire field, with no cross-wiring between them.
+  test("a fully populated usage object maps every field without cross-wiring", () => {
+    const usage = usageFromCompleted({
+      input_tokens: 3000,
+      output_tokens: 25,
+      input_tokens_details: { cached_tokens: 1500, cache_write_tokens: 500 },
+      output_tokens_details: { reasoning_tokens: 12 },
+    });
+    expect(usage).toEqual({
+      input: 1000,
+      output: 25,
+      cacheRead: 1500,
+      cacheWrite: 500,
+      thinking: 12,
+    });
+  });
+
+  // The non-streaming path shares the usage schema and mapping with SSE,
+  // but a future split between the two would silently lose the subset
+  // arithmetic; pin the same OpenAI shape through parseJSONResponse.
+  test("non-streaming response maps cache_write_tokens identically", () => {
+    const adapter = createOpenAIResponsesAdapter(source, {});
+    const events = adapter.parseJSONResponse(
+      JSON.stringify({
+        status: "completed",
+        output: [],
+        usage: {
+          input_tokens: 2600,
+          input_tokens_details: {
+            cached_tokens: 2000,
+            cache_write_tokens: 400,
+          },
+        },
+      }),
+    );
+    expect(usageEventOf(events).data.usage).toEqual({
+      input: 200,
+      output: 0,
+      cacheRead: 2000,
+      cacheWrite: 400,
+      thinking: 0,
+    });
+  });
+});

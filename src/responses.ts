@@ -604,6 +604,7 @@ const ResponsesUsage = type({
   "output_tokens?": "number",
   "input_tokens_details?": type({
     "cached_tokens?": "number",
+    "cache_write_tokens?": "number",
     "cache_creation_tokens?": "number",
   }).or("null"),
   "output_tokens_details?": type({ "reasoning_tokens?": "number" }).or("null"),
@@ -633,16 +634,20 @@ function toInferenceUsage(
   // cached token and inflates context occupancy up to ~2x on high
   // cache-hit sessions.
   const totalInput = usage.input_tokens ?? 0;
-  const cachedTokens = usage.input_tokens_details?.cached_tokens ?? 0;
+  const details = usage.input_tokens_details;
+  const cachedTokens = details?.cached_tokens ?? 0;
+  // OpenAI (GPT-5.6+) reports cache writes as `cache_write_tokens` and
+  // documents them as a subset of `input_tokens`, so they must be split out
+  // of input exactly like `cached_tokens`. Gateways fronting OpenAI-shaped
+  // endpoints report the Anthropic-shaped `cache_creation_tokens` instead;
+  // its subset relationship to `input_tokens` is unobservable from here, so
+  // that fallback keeps the historic behavior of not reducing input.
+  const openaiWriteTokens = details?.cache_write_tokens;
   return {
-    input: Math.max(0, totalInput - cachedTokens),
+    input: Math.max(0, totalInput - cachedTokens - (openaiWriteTokens ?? 0)),
     output: usage.output_tokens ?? 0,
     cacheRead: cachedTokens,
-    // The public Responses API usually omits a cache-write count (OpenAI
-    // does not charge for writing to the prompt cache); read it defensively
-    // in case a gateway/proxy in front of this OpenAI-shaped endpoint
-    // reports one, rather than always hardcoding zero.
-    cacheWrite: usage.input_tokens_details?.cache_creation_tokens ?? 0,
+    cacheWrite: openaiWriteTokens ?? details?.cache_creation_tokens ?? 0,
     thinking: usage.output_tokens_details?.reasoning_tokens ?? 0,
   };
 }
