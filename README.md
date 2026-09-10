@@ -84,6 +84,12 @@ hook field is documented individually in `src/responses.ts`.
   a semantic-terminal harness; it's also exported standalone.
 - `parallelToolCalls` is tri-state: absent omits the field, `true`/`false`
   send verbatim — some backends require an explicit `false`.
+- Usage mapping splits every field OpenAI documents as a subset of
+  `input_tokens` (`cached_tokens`, `cache_write_tokens`) out of `input`, so
+  the OpenAI-native fields stay non-overlapping when summed; the
+  Anthropic-shaped `cache_creation_tokens` that gateways emit is reported
+  as `cacheWrite` without reducing `input`, since its subset relationship
+  is unobservable from here.
 - A host must resolve one copy of `@intx/inference`: it's a peer dependency,
   and an adapter built against a second copy fails `instanceof
 ProtocolMismatchError` checks in the host's harness.

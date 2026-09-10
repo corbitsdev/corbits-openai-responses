@@ -166,7 +166,10 @@ describe("openai-responses adapter through runInference", () => {
             usage: {
               input_tokens: 100,
               output_tokens: 20,
-              input_tokens_details: { cached_tokens: 40 },
+              input_tokens_details: {
+                cached_tokens: 40,
+                cache_write_tokens: 10,
+              },
             },
           },
         }),
@@ -188,10 +191,10 @@ describe("openai-responses adapter through runInference", () => {
     expect(call.id).toBe("call_1");
     expect(call.arguments).toEqual({ cmd: "ls" });
     expect(done.data.usage).toEqual({
-      input: 60,
+      input: 50,
       output: 20,
       cacheRead: 40,
-      cacheWrite: 0,
+      cacheWrite: 10,
       thinking: 0,
     });
 
