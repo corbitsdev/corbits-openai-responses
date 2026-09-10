@@ -512,6 +512,28 @@ describe("Responses parser — usage mapping", () => {
     });
   });
 
+  // Usage counters are non-negative quantities. A backend reporting a
+  // negative write count is wire garbage: report zero rather than
+  // propagate it into sums, and never let subtracting a negative inflate
+  // input. A clamped zero still counts as an explicit value and suppresses
+  // the gateway fallback, matching the explicit-zero case above.
+  test("negative cache_write_tokens is clamped to zero without inflating input", () => {
+    const usage = usageFromCompleted({
+      input_tokens: 100,
+      input_tokens_details: {
+        cache_write_tokens: -5,
+        cache_creation_tokens: 77,
+      },
+    });
+    expect(usage).toEqual({
+      input: 100,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      thinking: 0,
+    });
+  });
+
   // All five counters populated at once: each TokenUsage field must come
   // from its own wire field, with no cross-wiring between them.
   test("a fully populated usage object maps every field without cross-wiring", () => {

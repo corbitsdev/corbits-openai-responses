@@ -642,12 +642,20 @@ function toInferenceUsage(
   // endpoints report the Anthropic-shaped `cache_creation_tokens` instead;
   // its subset relationship to `input_tokens` is unobservable from here, so
   // that fallback keeps the historic behavior of not reducing input.
-  const openaiWriteTokens = details?.cache_write_tokens;
+  // Counters are non-negative quantities: a negative write count is wire
+  // garbage, clamped to zero rather than propagated into sums or allowed to
+  // inflate input by subtracting a negative.
+  const rawWriteTokens = details?.cache_write_tokens;
+  const openaiWriteTokens =
+    rawWriteTokens === undefined ? undefined : Math.max(0, rawWriteTokens);
   return {
     input: Math.max(0, totalInput - cachedTokens - (openaiWriteTokens ?? 0)),
     output: usage.output_tokens ?? 0,
     cacheRead: cachedTokens,
-    cacheWrite: openaiWriteTokens ?? details?.cache_creation_tokens ?? 0,
+    cacheWrite: Math.max(
+      0,
+      openaiWriteTokens ?? details?.cache_creation_tokens ?? 0,
+    ),
     thinking: usage.output_tokens_details?.reasoning_tokens ?? 0,
   };
 }
