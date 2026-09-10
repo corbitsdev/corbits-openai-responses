@@ -534,6 +534,41 @@ describe("Responses parser — usage mapping", () => {
     });
   });
 
+  // The final cacheWrite clamp above also covers a negative gateway
+  // fallback; pin that by name so a future refactor of the chain cannot
+  // reintroduce a negative report on the gateway path alone.
+  test("negative cache_creation_tokens reports cacheWrite zero on the gateway path", () => {
+    const usage = usageFromCompleted({
+      input_tokens: 100,
+      input_tokens_details: { cache_creation_tokens: -9 },
+    });
+    expect(usage).toEqual({
+      input: 100,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      thinking: 0,
+    });
+  });
+
+  // Every counter negative at once: each must clamp independently so no
+  // sum goes negative and no subtraction of a negative inflates input.
+  test("all-negative counters clamp to zero without distorting any field", () => {
+    const usage = usageFromCompleted({
+      input_tokens: 100,
+      output_tokens: -3,
+      input_tokens_details: { cached_tokens: -20, cache_creation_tokens: -5 },
+      output_tokens_details: { reasoning_tokens: -2 },
+    });
+    expect(usage).toEqual({
+      input: 100,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      thinking: 0,
+    });
+  });
+
   // All five counters populated at once: each TokenUsage field must come
   // from its own wire field, with no cross-wiring between them.
   test("a fully populated usage object maps every field without cross-wiring", () => {
