@@ -41,11 +41,11 @@ const registry: AdapterRegistry = {
 };
 
 const source: InferenceSource = {
-  id: "openai-responses:gpt-x",
+  id: "openai-responses:model",
   provider: OPENAI_RESPONSES_PROVIDER,
   baseURL: "https://example.test/v1",
   apiKey: "key",
-  model: "gpt-x",
+  model: "model",
 };
 
 const userTurn = (text: string): ConversationTurn => ({
@@ -247,7 +247,7 @@ describe("openai-responses adapter through runInference", () => {
       userTurn("hi"),
       {
         role: "assistant",
-        model: "gpt-x",
+        model: "model",
         timestamp: 1,
         content: [
           {
