@@ -51,5 +51,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/corbitsdev/corbits-openai-responses.git"
+  },
+  "homepage": "https://github.com/corbitsdev/corbits-openai-responses",
+  "bugs": {
+    "url": "https://github.com/corbitsdev/corbits-openai-responses/issues"
   }
 }

@@ -54,10 +54,8 @@ bun run check   # typecheck + lint + format:check + test
 
 ## Distribution
 
-The package ships TypeScript source: `exports` points at `src/index.ts`,
-there is no build step and no `dist/`. Consumers (including
-`corbits-xai-provider` and `corbits-codex-provider`) depend on it with a
-`github:corbitsdev/corbits-openai-responses` specifier and Bun runs the
-source as-is, so a change here is consumable the moment it is pushed. An
-npm publish, if one is ever wanted, is `npm publish --access public` on a
-version bump with no other preparation.
+The package ships TypeScript source on npm as `@corbits/openai-responses`:
+`exports` points at `src/index.ts`, there is no build step and no `dist/`.
+Consumers install it with `bun add @corbits/openai-responses` and Bun runs
+the source as-is. It requires Bun >=1.2.0 per the `engines` field. To
+publish, bump the version and run `npm publish --access public`.

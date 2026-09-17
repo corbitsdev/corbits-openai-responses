@@ -10,13 +10,15 @@ implemented.
 
 ## Install
 
+Requires Bun >=1.2.0 (see the `engines` field in `package.json`). The
+package ships TypeScript source with no build step; Bun consumes it directly.
+
 ```
-bun add github:corbitsdev/corbits-openai-responses
+bun add @corbits/openai-responses
 ```
 
-The package ships TypeScript source and needs no build step; Bun consumes it
-directly. `@intx/inference` and `@intx/types` are peer dependencies and
-resolve to the host's own copy.
+`@intx/inference` and `@intx/types` are peer dependencies and resolve to
+the host's own copy.
 
 ## Usage
 
