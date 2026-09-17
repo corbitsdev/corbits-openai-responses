@@ -106,4 +106,4 @@ ProtocolMismatchError` checks in the host's harness.
 
 ## License
 
-LGPL-2.1-or-later.
+LGPL-2.1-only.
