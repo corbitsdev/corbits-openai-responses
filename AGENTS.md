@@ -57,5 +57,5 @@ bun run check   # typecheck + lint + format:check + test
 The package ships TypeScript source on npm as `@corbits/openai-responses`:
 `exports` points at `src/index.ts`, there is no build step and no `dist/`.
 Consumers install it with `bun add @corbits/openai-responses` and Bun runs
-the source as-is. It requires Bun >=1.2.0 per the `engines` field. To
+the source as-is. It requires Node >=24 and Bun >=1.2.0 per the `engines` field. To
 publish, bump the version and run `npm publish --access public`.
