@@ -10,7 +10,7 @@ implemented.
 
 ## Install
 
-Requires Bun >=1.2.0 (see the `engines` field in `package.json`). The
+Requires Node >=24 and Bun >=1.2.0 (see the `engines` field in `package.json`). The
 package ships TypeScript source with no build step; Bun consumes it directly.
 
 ```
