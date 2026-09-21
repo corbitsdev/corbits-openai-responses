@@ -1,30 +1,21 @@
 # @corbits/openai-responses
 
-An Interchange `ProviderAdapter` for the OpenAI Responses API wire protocol:
-text, tool calls, reasoning with `encrypted_content` replay, image and PDF
-input, SSE and non-streaming. It knows no vendor by name — every difference
-between backends that speak this protocol (Codex's ChatGPT backend, xAI/Grok's
-proxy, plain OpenAI) is a `ResponsesQuirks` config object, not a forked copy of
-the adapter. Structured output (`text.format`) and url-form file input are not
-implemented.
+An Interchange `ProviderAdapter` for the OpenAI Responses API wire protocol: text, tool calls, reasoning with `encrypted_content` replay, image and PDF input, SSE and non-streaming. Vendor differences (Codex, xAI/Grok, plain OpenAI) are a `ResponsesQuirks` bag, not a forked adapter. Structured output (`text.format`) and url-form file input are not implemented.
 
 ## Install
 
-Requires Node >=24 and Bun >=1.2.0 (see the `engines` field in `package.json`). The
-package ships TypeScript source with no build step; Bun consumes it directly.
-
-```
+```sh
+npm add @corbits/openai-responses
+pnpm add @corbits/openai-responses
+yarn add @corbits/openai-responses
 bun add @corbits/openai-responses
 ```
 
-`@intx/inference` and `@intx/types` are peer dependencies and resolve to
-the host's own copy.
+Requires Node >= 24 and Bun >= 1.2. The package ships TypeScript source; Bun consumes it directly. `@intx/inference` and `@intx/types` are peer dependencies and must resolve to the host's own copy.
 
-## Usage
+## Use
 
-Migrating an existing vendor adapter onto this package means reproducing its
-live wire shape under the host's own provider id, so bake the vendor's
-quirks into a factory rather than registering the bare default:
+Bake a vendor's wire shape into a factory. The host keeps its own provider id.
 
 ```ts
 import { responsesAdapterFactory } from "@corbits/openai-responses";
@@ -46,65 +37,48 @@ export const createGrokResponsesAdapter = responsesAdapterFactory(
 );
 ```
 
-A host keeps its existing provider id (`"grok-responses"` above) and registers
-`createGrokResponsesAdapter` against it exactly as it did its old adapter.
+## Full example
 
-For a fresh source with no prior wire shape to match, load the bare factory
-by provider id through an `AdapterManifest` entry instead — it applies
-protocol-native defaults and is not a drop-in replacement for an adapter
-whose wire shape already exists:
+For a source with no prior wire shape, load the protocol-native factory by provider id:
 
 ```ts
 import type { AdapterManifest } from "@intx/inference";
+import {
+  OPENAI_RESPONSES_PROVIDER,
+  createOpenAIResponsesAdapter,
+  responsesAdapterFactories,
+} from "@corbits/openai-responses";
 
 const manifest: AdapterManifest = [
   {
-    provider: "openai-responses",
+    provider: OPENAI_RESPONSES_PROVIDER,
     specifier: "@corbits/openai-responses",
     export: "createOpenAIResponsesAdapter",
   },
 ];
+
+void createOpenAIResponsesAdapter;
+void responsesAdapterFactories;
 ```
 
-## API
+`responsesAdapterFactories` maps `openai-responses` and `openai-compatible-responses` onto `createOpenAIResponsesAdapter`.
 
-See `src/index.ts` for the full public surface and its TSDoc; every quirk and
-hook field is documented individually in `src/responses.ts`.
+## How it works
 
-## Design notes
+`quirks` are JSON on `InferenceSource` (persisted, sent over the wire). `hooks` are code, applied once at `responsesAdapterFactory` construction. Defaults are protocol-native: system prompt, `maxTokens`, and `temperature` go through unless a quirk opts a backend out. The host owns provider ids; a reasoning signature is tagged with the id in effect when it was issued.
 
-- `quirks` are JSON (an `InferenceSource.quirks` bag, persisted and sent over
-  the wire); `hooks` are code, applied once at `responsesAdapterFactory`
-  construction, never smuggled into the serializable bag.
-- Defaults are protocol-native: the caller's system prompt, `maxTokens`, and
-  `temperature` are forwarded unless a quirk explicitly opts a backend out.
-- The host owns provider ids, not this package. A reasoning signature is
-  tagged with the provider id in effect when it was issued; renaming that id
-  later invalidates every signature's replay silently rather than erroring.
-- `isStreamTerminal` rides on the returned adapter value (not the
-  `ProviderAdapter` type, which 0.3.0 doesn't declare it on) for hosts running
-  a semantic-terminal harness; it's also exported standalone.
-- `parallelToolCalls` is tri-state: absent omits the field, `true`/`false`
-  send verbatim — some backends require an explicit `false`.
-- Usage mapping splits every field OpenAI documents as a subset of
-  `input_tokens` (`cached_tokens`, `cache_write_tokens`) out of `input`, so
-  the OpenAI-native fields stay non-overlapping when summed; the
-  Anthropic-shaped `cache_creation_tokens` that gateways emit is reported
-  as `cacheWrite` without reducing `input`, since its subset relationship
-  is unobservable from here.
-- A host must resolve one copy of `@intx/inference`: it's a peer dependency,
-  and an adapter built against a second copy fails `instanceof
-ProtocolMismatchError` checks in the host's harness.
+## Contributing
 
-## Not supported
+```sh
+bun install
+bun run typecheck
+bun run lint
+bun run format:check
+bun run test
+bun run check
+```
 
-- Structured output (`text.format`) and url-form `input_file` document input.
-- Document input is PDF only, matching upstream's Chat Completions adapter.
-- The `previous_response_id` / `store: true` path is unexercised by this
-  package's tests.
-- `extractRetryAfterMs` / `extractPacingDelayMs` duplicate logic from
-  upstream's OpenAI Chat Completions adapter, which doesn't export them;
-  delete these once `@intx/inference` does.
+`bun run format` rewrites the tree. `bun run check` is typecheck + lint + format:check + test.
 
 ## License
 
