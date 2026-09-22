@@ -12,6 +12,7 @@ import type {
   InferenceEvent,
   InferenceSource,
 } from "@intx/types/runtime";
+import type { CredentialMaterial } from "@intx/types";
 import {
   createOpenAIResponsesAdapter,
   OPENAI_RESPONSES_PROVIDER,
@@ -44,9 +45,13 @@ const source: InferenceSource = {
   id: "openai-responses:model",
   provider: OPENAI_RESPONSES_PROVIDER,
   baseURL: "https://example.test/v1",
-  apiKey: "key",
+  credentialId: "key",
   model: "model",
 };
+
+const readMaterial = (credentialId: string): CredentialMaterial => ({
+  secret: credentialId,
+});
 
 const userTurn = (text: string): ConversationTurn => ({
   role: "user",
@@ -82,6 +87,7 @@ async function drainRun(
     turns,
     source,
     nextSeq: () => seq++,
+    readMaterial,
   }))
     events.push(ev);
 }
