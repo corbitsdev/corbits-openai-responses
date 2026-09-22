@@ -22,67 +22,53 @@ yarn add @corbits/openai-responses
 bun add @corbits/openai-responses
 ```
 
-Bake a vendor's wire shape into a factory, then build an adapter for one
-source each: the Grok factory below, and the protocol-native
-`createOpenAIResponsesAdapter` — loaded by provider id — for plain OpenAI.
-The host keeps its own provider id.
+Bake a vendor's wire shape into a quirks bag, then hand it to
+`responsesAdapterFactory` to get back an `AdapterFactory`. This mirrors how
+`@corbits/xai-provider` wires up Grok's Responses-speaking CLI proxy:
 
 ```ts
 import {
-  OPENAI_RESPONSES_PROVIDER,
-  createOpenAIResponsesAdapter,
   responsesAdapterFactory,
+  type ResponsesQuirks,
 } from "@corbits/openai-responses";
-import type { AdapterManifest } from "@intx/inference";
-import { loadAdapterRegistry } from "@intx/inference/providers";
-import type { LastCycleSource } from "@intx/types/runtime";
+import type { AdapterFactory } from "@intx/inference";
 
-export const createGrokResponsesAdapter = responsesAdapterFactory(
-  {
-    contentShape: "flat",
-    sessionIdOption: "sessionId",
-    sessionIdHeader: "x-grok-session",
-    reasoning: { summary: "auto" },
-    headers: { static: { "x-grok-client": "my-harness" } },
-    maxOutputTokens: true,
-    temperature: false,
+// Mirrors the vendor's own request shape: headers, system-prompt
+// placement, reasoning summary depth, which stock fields to suppress.
+const grokResponsesQuirks: ResponsesQuirks = {
+  path: "/v1/responses",
+  headers: {
+    static: { "x-grok-client-identifier": "my-harness" },
   },
-  {
-    wrapSystemPrompt: (prompt) =>
-      `<grok-instructions>${prompt}</grok-instructions>`,
-  },
-);
-
-const manifest: AdapterManifest = [
-  {
-    provider: OPENAI_RESPONSES_PROVIDER,
-    specifier: "@corbits/openai-responses",
-    export: "createOpenAIResponsesAdapter",
-  },
-];
-
-await loadAdapterRegistry(manifest);
-
-const grok: LastCycleSource = {
-  sourceId: "grok/1",
-  provider: "grok",
-  model: "grok-4",
+  sessionIdOption: "sessionId",
+  systemPrompt: { role: "system", shape: "string" },
+  contentShape: "flat",
+  reasoning: { summary: "detailed" },
+  maxOutputTokens: false,
+  temperature: false,
 };
 
-export const grokAdapter = createGrokResponsesAdapter(grok);
-
-const openai: LastCycleSource = {
-  sourceId: "openai/1",
-  provider: OPENAI_RESPONSES_PROVIDER,
-  model: "gpt-5",
-};
-
-export const openaiAdapter = createOpenAIResponsesAdapter(openai);
+export const createGrokResponsesAdapter: AdapterFactory =
+  responsesAdapterFactory(grokResponsesQuirks);
 ```
 
-`responsesAdapterFactories` maps `openai-responses` and
-`openai-compatible-responses` onto `createOpenAIResponsesAdapter`, so a host
-can register either provider id with the same factory.
+A sidecar host registers the resulting export on its
+`SIDECAR_ADAPTER_MANIFEST` (one entry per provider id, `specifier` naming an
+already-installed module) — this package ships no manifest entry itself; the
+vendor package wrapping it does, e.g.
+`{"provider":"xai","specifier":"@corbits/xai-provider","export":"createXaiResponsesAdapter"}`.
+
+For a source that already speaks the protocol natively — plain OpenAI, or an
+OpenAI-compatible Responses endpoint — no quirks bag is needed at all:
+register `createOpenAIResponsesAdapter` directly. `responsesAdapterFactories`
+maps both `openai-responses` and `openai-compatible-responses` provider ids
+onto it, so a host can register either id with the same factory:
+
+```ts
+import { responsesAdapterFactories } from "@corbits/openai-responses";
+
+responsesAdapterFactories["openai-responses"]; // === createOpenAIResponsesAdapter
+```
 
 ## How it works
 
