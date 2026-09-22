@@ -9,9 +9,9 @@
       },
       "devDependencies": {
         "@eslint/js": "9.34.0",
-        "@intx/inference": "0.3.0",
-        "@intx/inference-testing": "0.3.0",
-        "@intx/types": "0.3.0",
+        "@intx/inference": "0.4.0",
+        "@intx/inference-testing": "0.4.0",
+        "@intx/types": "0.4.0",
         "@types/bun": "1.3.9",
         "eslint": "9.34.0",
         "jiti": "2.5.1",
@@ -20,8 +20,8 @@
         "typescript-eslint": "8.42.0",
       },
       "peerDependencies": {
-        "@intx/inference": ">=0.3.0",
-        "@intx/types": ">=0.3.0",
+        "@intx/inference": ">=0.4.0",
+        "@intx/types": ">=0.4.0",
       },
     },
   },
@@ -58,15 +58,15 @@
 
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
 
-    "@intx/inference": ["@intx/inference@0.3.0", "", { "dependencies": { "@intx/log": "0.3.0", "@intx/types": "0.3.0", "arktype": "^2.1.29" } }, "sha512-2DxqWRp5cSziXgDXPomSy0HTLVesBCtZErsKXYFnliTwYM6U+GRKk5rzwWMMgMWMFbtUaiogPExcNQYBYmfjQA=="],
+    "@intx/inference": ["@intx/inference@0.4.0", "", { "dependencies": { "@intx/log": "0.4.0", "@intx/types": "0.4.0", "arktype": "^2.1.29" } }, "sha512-cuaqCqotmjg0OzGUm8QmFJr1xX5wPVS0LeuhrxHsj0X3ImoCzVB4e/ttTc+DaP3K1tTMQ/8Q8HHCAPX36mOecQ=="],
 
-    "@intx/inference-discovery": ["@intx/inference-discovery@0.3.0", "", { "dependencies": { "@intx/types": "0.3.0", "arktype": "^2.1.29" } }, "sha512-JdlwqTuF5z53Hfy36ANZVrbCjhFoqHgJiVNyV/LSNpTA/sPGFxutuPB1MRG5gTtDpLE0tJV775NiRXGqp+F3zA=="],
+    "@intx/inference-discovery": ["@intx/inference-discovery@0.4.0", "", { "dependencies": { "@intx/types": "0.4.0", "arktype": "^2.1.29" } }, "sha512-XZQYZZ9JHcTVNVMZBffOqCzHtmRwvZZxLKvwNg1vN9d4EPfXaCF9rnbDgdaUCWXPfa/T+y2aZs0m0X3a/4xPAQ=="],
 
-    "@intx/inference-testing": ["@intx/inference-testing@0.3.0", "", { "dependencies": { "@intx/inference": "0.3.0", "@intx/inference-discovery": "0.3.0", "@intx/types": "0.3.0", "arktype": "^2.1.29" } }, "sha512-zhCHVYH2ULEm3E0U6WNXoC6qi/EqBwX+XoCkubiEY71PmhVo57J7Vnh/+rG3v0BHJtiAefafiqV7KaXrsCkhow=="],
+    "@intx/inference-testing": ["@intx/inference-testing@0.4.0", "", { "dependencies": { "@intx/inference": "0.4.0", "@intx/inference-discovery": "0.4.0", "@intx/types": "0.4.0", "arktype": "^2.1.29" } }, "sha512-nyKbyv+ZPFCJ+Fl3Nczkr/gp/kwa6zVcwFmve7kM0JTpNFfMWspZXUz7QnQbrIpSuvx1i1QDUNRiokGvYS9jQA=="],
 
-    "@intx/log": ["@intx/log@0.3.0", "", { "dependencies": { "@logtape/hono": "^2.0.2", "@logtape/logtape": "^2.0.2" }, "peerDependencies": { "hono": "^4.0.0" }, "optionalPeers": ["hono"] }, "sha512-iooPSZjiEUO1A91X5STRhOAk+2RprliB4nbriV/dOOz86kuxZ60y5T8ISQ5Jaj1US870gntN6QwnefY38aWi2Q=="],
+    "@intx/log": ["@intx/log@0.4.0", "", { "dependencies": { "@logtape/hono": "^2.0.2", "@logtape/logtape": "^2.0.2" }, "peerDependencies": { "hono": "^4.0.0" }, "optionalPeers": ["hono"] }, "sha512-f1IPZ/9YpEqlA0I2UZPOlRJOTDoOFEZRwZoUVuw8DpgR1WatOMm4hA0E8o6Mtz+pA0ux7gVdls4y/JZcgypsfQ=="],
 
-    "@intx/types": ["@intx/types@0.3.0", "", { "dependencies": { "arktype": "^2.1.29", "semver": "^7.7.2" } }, "sha512-PJ+v3IhtfZ4J7ZqJ8E39TteRMnC6Y503Q0JeCJdskkK+jhcjx01z7TJSozucagauAlpyh8Hn/9CyWFl53Ji0DQ=="],
+    "@intx/types": ["@intx/types@0.4.0", "", { "dependencies": { "arktype": "^2.1.29", "semver": "^7.7.2" } }, "sha512-nJ2fcmskMOZNMRfbHs5ueKpCANHNttoL+sZgIoFaVUF/QLpFWfVp0YV72CQAaa9bVv9j5kRSwtSOCCGSlwQ6Dw=="],
 
     "@logtape/hono": ["@logtape/hono@2.3.2", "", { "peerDependencies": { "@logtape/logtape": "^2.3.2", "hono": "^4.0.0" } }, "sha512-fwjfktpQSucHQCO6OYCHUrcgwHPhU41VKTJt2gtqSoW3MjYMUtdZJTGJx2JTAj+8zyQ1cXqugkEKVG07wwSU4g=="],
 
