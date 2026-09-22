@@ -22,10 +22,20 @@ yarn add @corbits/openai-responses
 bun add @corbits/openai-responses
 ```
 
-Bake a vendor's wire shape into a factory. The host keeps its own provider id.
+Bake a vendor's wire shape into a factory, then build an adapter for one
+source each: the Grok factory below, and the protocol-native
+`createOpenAIResponsesAdapter` — loaded by provider id — for plain OpenAI.
+The host keeps its own provider id.
 
 ```ts
-import { responsesAdapterFactory } from "@corbits/openai-responses";
+import {
+  OPENAI_RESPONSES_PROVIDER,
+  createOpenAIResponsesAdapter,
+  responsesAdapterFactory,
+} from "@corbits/openai-responses";
+import type { AdapterManifest } from "@intx/inference";
+import { loadAdapterRegistry } from "@intx/inference/providers";
+import type { LastCycleSource } from "@intx/types/runtime";
 
 export const createGrokResponsesAdapter = responsesAdapterFactory(
   {
@@ -42,15 +52,6 @@ export const createGrokResponsesAdapter = responsesAdapterFactory(
       `<grok-instructions>${prompt}</grok-instructions>`,
   },
 );
-```
-
-For a source with no prior wire shape, load the protocol-native factory by
-provider id:
-
-```ts
-import type { AdapterManifest } from "@intx/inference";
-import { loadAdapterRegistry } from "@intx/inference/providers";
-import { OPENAI_RESPONSES_PROVIDER } from "@corbits/openai-responses";
 
 const manifest: AdapterManifest = [
   {
@@ -61,10 +62,27 @@ const manifest: AdapterManifest = [
 ];
 
 await loadAdapterRegistry(manifest);
+
+const grok: LastCycleSource = {
+  sourceId: "grok/1",
+  provider: "grok",
+  model: "grok-4",
+};
+
+export const grokAdapter = createGrokResponsesAdapter(grok);
+
+const openai: LastCycleSource = {
+  sourceId: "openai/1",
+  provider: OPENAI_RESPONSES_PROVIDER,
+  model: "gpt-5",
+};
+
+export const openaiAdapter = createOpenAIResponsesAdapter(openai);
 ```
 
 `responsesAdapterFactories` maps `openai-responses` and
-`openai-compatible-responses` onto `createOpenAIResponsesAdapter`.
+`openai-compatible-responses` onto `createOpenAIResponsesAdapter`, so a host
+can register either provider id with the same factory.
 
 ## How it works
 
