@@ -3,8 +3,8 @@
 An Interchange `ProviderAdapter` for the OpenAI Responses API wire protocol:
 text, tool calls, reasoning with `encrypted_content` replay, image and PDF
 input, SSE and non-streaming. Vendor differences (Codex, xAI/Grok, plain
-OpenAI) are a `ResponsesQuirks` bag, not a forked adapter. Structured output
-(`text.format`) and url-form file input are not implemented.
+OpenAI) are a `ResponsesQuirks` bag, not a forked adapter. Current scope covers
+text, tool calls, reasoning replay, and image/PDF input.
 
 ## Runtime support
 
@@ -33,7 +33,7 @@ export const createGrokResponsesAdapter = responsesAdapterFactory(
     sessionIdOption: "sessionId",
     sessionIdHeader: "x-grok-session",
     reasoning: { summary: "auto" },
-    headers: { static: { "x-grok-client": "workbench" } },
+    headers: { static: { "x-grok-client": "my-harness" } },
     maxOutputTokens: true,
     temperature: false,
   },
