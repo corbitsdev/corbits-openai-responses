@@ -49,11 +49,8 @@ provider id:
 
 ```ts
 import type { AdapterManifest } from "@intx/inference";
-import {
-  OPENAI_RESPONSES_PROVIDER,
-  createOpenAIResponsesAdapter,
-  responsesAdapterFactories,
-} from "@corbits/openai-responses";
+import { loadAdapterRegistry } from "@intx/inference/providers";
+import { OPENAI_RESPONSES_PROVIDER } from "@corbits/openai-responses";
 
 const manifest: AdapterManifest = [
   {
@@ -63,9 +60,7 @@ const manifest: AdapterManifest = [
   },
 ];
 
-void createOpenAIResponsesAdapter;
-void responsesAdapterFactories;
-void manifest;
+await loadAdapterRegistry(manifest);
 ```
 
 `responsesAdapterFactories` maps `openai-responses` and
