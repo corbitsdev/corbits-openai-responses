@@ -23,11 +23,11 @@ For a source with no prior wire shape, the host loads
 
 ## Quirks vs hooks
 
-| | `quirks` | `hooks` |
-| --- | --- | --- |
-| Shape | JSON on `InferenceSource` | TypeScript functions |
-| Lifetime | Persisted and sent over the wire | Applied once at factory construction |
-| Typical content | Content shape, session-id option/header, reasoning summary, static headers, max-output-tokens / temperature opt-out | `wrapSystemPrompt` |
+|                 | `quirks`                                                                                                            | `hooks`                              |
+| --------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Shape           | JSON on `InferenceSource`                                                                                           | TypeScript functions                 |
+| Lifetime        | Persisted and sent over the wire                                                                                    | Applied once at factory construction |
+| Typical content | Content shape, session-id option/header, reasoning summary, static headers, max-output-tokens / temperature opt-out | `wrapSystemPrompt`                   |
 
 A function-valued field cannot ride in `quirks`; code-shaped accommodations
 belong in `hooks`.
