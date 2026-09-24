@@ -8,9 +8,10 @@ text, tool calls, reasoning replay, and image/PDF input.
 
 ## Runtime support
 
-Bun >= 1.2 is the development runtime and consumes this package's TypeScript
-source directly. Node >= 24 is the engines floor; native Node does not load
-this extensionless TypeScript source as-is. `@intx/inference` and `@intx/types`
+Bun >= 1.2 is the development runtime. The package ships compiled `dist/`
+(`main`/`types` and `exports` point at `dist/index.js` / `dist/index.d.ts`,
+built with `bun run build`); both Bun and Node >= 24 load the built output.
+`@intx/inference` and `@intx/types`
 are peer dependencies and must resolve to the host's own copy.
 
 ## Quickstart
