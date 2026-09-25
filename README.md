@@ -1,87 +1,106 @@
 # @corbits/openai-responses
 
-An Interchange `ProviderAdapter` for the OpenAI Responses API wire protocol:
-text, tool calls, reasoning with `encrypted_content` replay, image and PDF
-input, SSE and non-streaming. Vendor differences (Codex, xAI/Grok, plain
-OpenAI) are a `ResponsesQuirks` bag, not a forked adapter. Current scope covers
-text, tool calls, reasoning replay, and image/PDF input.
-
-## Runtime support
-
-Bun >= 1.2 is the development runtime. The package ships compiled `dist/`
-(`main`/`types` and `exports` point at `dist/index.js` / `dist/index.d.ts`,
-built with `bun run build`); both Bun and Node >= 24 load the built output.
-`@intx/inference` and `@intx/types`
-are peer dependencies and must resolve to the host's own copy.
+Use this adapter to run Interchange inference against any OpenAI Responses
+API endpoint (OpenAI, Codex, xAI/Grok), with text, tool calls, reasoning
+replay, and image/PDF input.
 
 ## Quickstart
 
 ```sh
-npm add @corbits/openai-responses
-pnpm add @corbits/openai-responses
-yarn add @corbits/openai-responses
-bun add @corbits/openai-responses
+npm add @corbits/openai-responses @intx/inference @intx/types
 ```
-
-Bake a vendor's wire shape into a quirks bag, then hand it to
-`responsesAdapterFactory` to get back an `AdapterFactory`. This mirrors how
-`@corbits/xai-provider` wires up Grok's Responses-speaking CLI proxy:
 
 ```ts
+import { createDependencies, runInference } from "@intx/inference";
 import {
-  responsesAdapterFactory,
-  type ResponsesQuirks,
+  createOpenAIResponsesAdapter,
+  OPENAI_RESPONSES_PROVIDER,
 } from "@corbits/openai-responses";
-import type { AdapterFactory } from "@intx/inference";
 
-// Mirrors the vendor's own request shape: headers, system-prompt
-// placement, reasoning summary depth, which stock fields to suppress.
-const grokResponsesQuirks: ResponsesQuirks = {
-  path: "/v1/responses",
-  headers: {
-    static: { "x-grok-client-identifier": "my-harness" },
+const deps = createDependencies({
+  has: (provider) => provider === OPENAI_RESPONSES_PROVIDER,
+  resolve: (source, quirks) => createOpenAIResponsesAdapter(source, quirks),
+});
+
+let seq = 0;
+for await (const event of runInference({
+  deps,
+  source: {
+    id: "openai",
+    provider: OPENAI_RESPONSES_PROVIDER,
+    baseURL: "https://api.openai.com/v1",
+    credentialId: "OPENAI_API_KEY",
+    model: "gpt-5-mini",
   },
-  sessionIdOption: "sessionId",
-  systemPrompt: { role: "system", shape: "string" },
+  turns: [
+    {
+      role: "user",
+      timestamp: Date.now(),
+      content: [{ type: "text", text: "Say hello." }],
+    },
+  ],
+  nextSeq: () => seq++,
+  readMaterial: (id) => {
+    const secret = process.env[id];
+    if (secret === undefined) throw new Error(`${id} is not set`);
+    return { secret };
+  },
+})) {
+  if (event.type === "inference.text.delta") {
+    process.stdout.write(event.data.token);
+  }
+}
+```
+
+`@intx/inference` and `@intx/types` are peer dependencies; the host supplies
+its own copy. Requires Node >= 24 or Bun >= 1.2.
+
+## Using with Interchange
+
+Register `createOpenAIResponsesAdapter` under the `openai-responses`
+provider id in your host's `AdapterRegistry`, as the quickstart does. A
+source's `quirks` bag is passed through as the factory's second argument.
+
+For a vendor whose backend deviates from the protocol, bake its quirks into a
+factory once with `responsesAdapterFactory`:
+
+```ts
+import { responsesAdapterFactory } from "@corbits/openai-responses";
+
+export const createVendorAdapter = responsesAdapterFactory({
+  path: "/v1/responses",
   contentShape: "flat",
-  reasoning: { summary: "detailed" },
-  maxOutputTokens: false,
   temperature: false,
-};
-
-export const createGrokResponsesAdapter: AdapterFactory =
-  responsesAdapterFactory(grokResponsesQuirks);
+});
 ```
 
-A sidecar host registers the resulting export on its
-`SIDECAR_ADAPTER_MANIFEST` (one entry per provider id, `specifier` naming an
-already-installed module) — this package ships no manifest entry itself; the
-vendor package wrapping it does, e.g.
-`{"provider":"xai","specifier":"@corbits/xai-provider","export":"createXaiResponsesAdapter"}`.
+The optional second argument, `ResponsesHooks`, carries code-shaped
+accommodations (`wrapSystemPrompt`, `includeReasoningEffort`) that cannot
+live in a JSON quirks bag.
 
-## How it works
+## Quirks
 
-`quirks` are JSON on `InferenceSource` (persisted, sent over the wire).
-`hooks` are code, applied once at `responsesAdapterFactory` construction.
-Defaults are protocol-native: system prompt, `maxTokens`, and `temperature`
-go through unless a quirk opts a backend out. The host owns provider ids; a
-reasoning signature is tagged with the id in effect when it was issued.
+Every field is optional. An absent field keeps the protocol-native default.
+Unknown keys are rejected.
 
-## Development
-
-```sh
-git clone https://github.com/corbitsdev/corbits-openai-responses.git
-cd corbits-openai-responses
-bun install
-bun run typecheck
-bun run lint
-bun run format:check
-bun run test
-bun run check
-```
-
-`bun run format` rewrites the tree. `bun run check` is typecheck + lint +
-format:check + test.
+| Quirk                    | Type                                                            | Default                               | Effect on the request                                                         |
+| ------------------------ | --------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------- |
+| `path`                   | `string`                                                        | `"/responses"`                        | Request path appended to the source's `baseURL`.                              |
+| `headers.static`         | `Record<string, string>`                                        | `{}`                                  | Headers added verbatim; they can override the stock headers.                  |
+| `headers.modelHeader`    | `string`                                                        | unset                                 | Header name that carries the model id.                                        |
+| `headers.fromOption`     | `{ optionKey, header }[]`                                       | `[]`                                  | Copies each non-empty string `providerOptions[optionKey]` into `header`.      |
+| `sessionIdOption`        | `string`                                                        | unset                                 | `providerOptions` key whose value is sent as `prompt_cache_key`.              |
+| `sessionIdHeader`        | `string`                                                        | unset                                 | Also sends that session id in this header. Ignored without `sessionIdOption`. |
+| `systemPrompt`           | `{ role: "system" \| "developer", shape: "string" \| "parts" }` | `{ role: "system", shape: "string" }` | Role and content shape of the leading system-prompt item.                     |
+| `contentShape`           | `"typed" \| "flat"`                                             | `"typed"`                             | `flat` sends text-only content as a plain string instead of typed parts.      |
+| `parallelToolCalls`      | `boolean`                                                       | unset                                 | Unset omits `parallel_tool_calls`; a boolean is sent as given.                |
+| `maxOutputTokens`        | `boolean`                                                       | `true`                                | `false` omits `max_output_tokens` even when the caller sets `maxTokens`.      |
+| `temperature`            | `boolean`                                                       | `true`                                | `false` omits `temperature` even when the caller sets it.                     |
+| `store`                  | `boolean`                                                       | `false`                               | Sent as `store`.                                                              |
+| `stream`                 | `boolean`                                                       | `true`                                | Sent as `stream`; `false` also sends `accept: application/json`.              |
+| `reasoning.summary`      | `"auto" \| "detailed"`                                          | unset                                 | Sent as `reasoning.summary`.                                                  |
+| `reasoning.effortOption` | `string`                                                        | unset                                 | `providerOptions` key whose value is sent as `reasoning.effort`.              |
+| `instructions`           | `string`                                                        | unset                                 | Sent as `instructions`.                                                       |
 
 ## License
 
