@@ -11,7 +11,7 @@ session-id routing, request-body switches) are config, not forked code.
 `src/responses.ts` holds the quirks schema + resolver, the header
 extractors, and the factory that wires `src/protocol/` together, following
 Interchange's `inference-discovery-openai` layout. `src/index.ts` is
-re-exports plus registry-shaped values:
+re-exports plus the provider ids and factory record:
 
 - `src/responses.ts` — `ResponsesQuirks` and its resolver, `ResponsesHooks`,
   the rate-limit header extractors, and `createOpenAIResponsesAdapter` /
@@ -22,7 +22,8 @@ re-exports plus registry-shaped values:
 - `src/protocol/iterator.ts` — event schemas, SSE streaming parse,
   non-streaming JSON parse, block indexing, and terminal-event detection.
 - `src/index.ts` — re-exports of the above plus the two provider-id
-  constants and `responsesAdapterFactories`.
+  constants (`OPENAI_COMPATIBLE_RESPONSES_PROVIDER` is deprecated, removed
+  in 0.3.0) and `responsesAdapterFactories`.
 - `*.test.ts` next to the source they cover.
 
 ## Rules
@@ -39,13 +40,13 @@ re-exports plus registry-shaped values:
   the caller supplies.
 - Public surface is `src/index.ts`'s export list only:
   `createOpenAIResponsesAdapter`, `responsesAdapterFactory`,
-  `responsesAdapterFactories`, `ResponsesQuirks`, `ResponsesHooks`,
-  `isResponsesStreamTerminal`, and the two provider-id constants.
+  `responsesAdapterFactories`, `ResponsesQuirks`, `ResponsesHooks`, and the
+  two provider-id constants.
   Everything else in `src/responses.ts` and `src/protocol/`
-  (`parseResponse`, `parseJSONResponse`, block indexing, signature
-  tag/replay, the resolved quirks type) is module-private. Tests go through
-  the public factory only — never import `./responses` directly from a
-  test.
+  (`parseResponse`, `parseJSONResponse`, `isResponsesStreamTerminal`,
+  block indexing, signature tag/replay, the resolved quirks type) is
+  package-private. Tests go through the public factory only — never import
+  `./responses` directly from a test.
 - Tests only for load-bearing risk (wire-format encoding, state machines,
   hostile-input parsing) — not for trivial mapping or "returns what I passed
   in".

@@ -1,6 +1,6 @@
 {
   "name": "@corbits/openai-responses",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Interchange ProviderAdapter for the OpenAI Responses API wire protocol with quirks-based vendor configuration, SSE and non-streaming parsing, and reasoning signature replay.",
   "license": "LGPL-2.1-only",
   "author": "Sawyer Cutler <sawyer@dirtroad.dev>",

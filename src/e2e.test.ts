@@ -14,8 +14,9 @@ import type {
 } from "@intx/types/runtime";
 import type { CredentialMaterial } from "@intx/types";
 import {
-  createOpenAIResponsesAdapter,
+  OPENAI_COMPATIBLE_RESPONSES_PROVIDER,
   OPENAI_RESPONSES_PROVIDER,
+  responsesAdapterFactories,
 } from "./index";
 
 // Narrows the replayed request body for the reasoning-replay assertion below
@@ -32,13 +33,18 @@ const utf8 = (s: string): Uint8Array => new TextEncoder().encode(s);
 const sse = (event: Record<string, unknown>): Uint8Array =>
   utf8(`event: ${String(event["type"])}\ndata: ${JSON.stringify(event)}\n\n`);
 
-// @intx/inference 0.3.0 does not export `createAdapterRegistry` from either
+// @intx/inference 0.4.0 does not export `createAdapterRegistry` from either
 // of its two published subpaths ("." or "./providers"); a registry is built
 // by hand here the same way a host's own `AdapterRegistry` implementation
 // would.
 const registry: AdapterRegistry = {
-  has: (provider) => provider === OPENAI_RESPONSES_PROVIDER,
-  resolve: (source) => createOpenAIResponsesAdapter(source, {}),
+  has: (provider) => provider in responsesAdapterFactories,
+  resolve: (source) => {
+    const factory = responsesAdapterFactories[source.provider];
+    if (factory === undefined)
+      throw new Error(`no adapter: ${source.provider}`);
+    return factory(source, {});
+  },
 };
 
 const source: InferenceSource = {
@@ -81,6 +87,7 @@ async function drainRun(
   harness: Harness,
   turns: ConversationTurn[],
   events: InferenceEvent[],
+  source: InferenceSource,
 ): Promise<void> {
   let seq = 0;
   for await (const ev of harness.runInference({
@@ -95,9 +102,10 @@ async function drainRun(
 async function collect(
   harness: Harness,
   turns: ConversationTurn[],
+  runSource: InferenceSource = source,
 ): Promise<InferenceEvent[]> {
   const events: InferenceEvent[] = [];
-  const drain = drainRun(harness, turns, events);
+  const drain = drainRun(harness, turns, events, runSource);
   await harness.run();
   await drain;
   return events;
@@ -299,5 +307,38 @@ describe("openai-responses adapter through runInference", () => {
       "function_call_output",
     ]);
     expect(requestBody.input[1]?.encrypted_content).toBe("CIPHER");
+  });
+
+  test("a source stored under the deprecated 0.1 provider id still runs", async () => {
+    harness = setupHarness({ adapters: registry });
+    const stream = harness.scenario.createStream();
+    harness.scenario.whenRequestMatches(
+      (req) => new URL(req.url).pathname === "/v1/responses",
+      stream,
+    );
+    stream.enqueueAll(
+      [
+        sse({
+          type: "response.output_text.delta",
+          item_id: "msg_1",
+          delta: "still here",
+        }),
+        sse({
+          type: "response.completed",
+          response: { usage: { input_tokens: 1, output_tokens: 1 } },
+        }),
+      ],
+      { startAt: 1 },
+    );
+    const events = await collect(harness, [userTurn("hi")], {
+      id: "openai-compatible-responses:model",
+      provider: OPENAI_COMPATIBLE_RESPONSES_PROVIDER,
+      baseURL: "https://example.test/v1",
+      credentialId: "key",
+      model: "model",
+    });
+    expect(doneEvent(events).data.turn.content).toEqual([
+      { type: "text", text: "still here" },
+    ]);
   });
 });
