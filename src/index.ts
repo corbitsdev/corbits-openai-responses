@@ -4,8 +4,8 @@ import {
   isResponsesStreamTerminal,
   responsesAdapterFactory,
   ResponsesQuirks,
-} from "./responses";
-import type { ResponsesHooks } from "./responses";
+} from "./responses.js";
+import type { ResponsesHooks } from "./responses.js";
 
 export {
   createOpenAIResponsesAdapter,
