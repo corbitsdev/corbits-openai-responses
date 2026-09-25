@@ -36,8 +36,8 @@
     "arktype": "2.2.3"
   },
   "peerDependencies": {
-    "@intx/inference": ">=0.4.0",
-    "@intx/types": ">=0.4.0"
+    "@intx/inference": "^0.4.0",
+    "@intx/types": "^0.4.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
