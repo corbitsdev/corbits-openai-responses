@@ -1,14 +1,26 @@
 # @corbits/openai-responses
 
-Use this adapter to run Interchange inference against any OpenAI Responses
-API endpoint (OpenAI, Codex, xAI/Grok), with text, tool calls, reasoning
-replay, and image/PDF input.
+An `@intx/inference` provider adapter for the OpenAI Responses API (`/v1/responses`): SSE and JSON responses, text, tool calls, image and PDF input, and reasoning replay. An inference provider for Corbits and Interchange agents that also works in any host that runs `@intx/inference`.
+
+## Why @corbits/openai-responses?
+
+1. **One adapter for every Responses backend.** OpenAI, Codex, xAI and Ollama's `/v1` differ in paths, headers and body fields. Those differences are a JSON `quirks` object on the source, not forked code.
+2. **Reasoning survives across turns.** Encrypted reasoning items are tagged with the provider that issued them. They are replayed only to the same provider and model, so multi-turn reasoning keeps its context and the backend never rejects a signature it did not issue.
+3. **Interchange error and retry semantics.** Requests run through `runInference`, so rate limits, pacing headers and auth failures behave the same as for the built-in providers.
+
+It speaks only the Responses protocol. For Chat Completions, use the built-in OpenAI adapter in `@intx/inference`.
+
+## Install
+
+```bash
+bun add @corbits/openai-responses @intx/inference@^0.4.0 @intx/types@^0.4.0
+```
+
+Runs on Bun >= 1.2 or Node >= 24.
 
 ## Quickstart
 
-```sh
-npm add @corbits/openai-responses @intx/inference @intx/types
-```
+Needs `OPENAI_API_KEY` set.
 
 ```ts
 import { createDependencies, runInference } from "@intx/inference";
@@ -46,42 +58,37 @@ for await (const event of runInference({
     return { secret };
   },
 })) {
-  if (event.type === "inference.text.delta") {
+  if (event.type === "inference.text.delta")
     process.stdout.write(event.data.token);
-  }
+  if (event.type === "inference.error")
+    throw new Error(event.data.error.message);
 }
+process.stdout.write("\n");
 ```
 
-`@intx/inference` and `@intx/types` are peer dependencies; the host supplies
-its own copy. Requires Node >= 24 or Bun >= 1.2.
+## Where it fits
 
-## Using with Interchange
+[Interchange](https://github.com/faremeter/interchange) runs AI agents as principals (accounts that hold their own identity, permissions and credentials). Corbits packages add what an agent product needs around it.
 
-Register `createOpenAIResponsesAdapter` under the `openai-responses`
-provider id in your host's `AdapterRegistry`, as the quickstart does. A
-source's `quirks` bag is passed through as the factory's second argument.
+- **Runs in:** the agent sidecar (the runtime next to each agent), or any process that calls `runInference`. No hub is required.
+- **Plugs into:** the [`@intx/inference`](https://github.com/faremeter/interchange/tree/main/packages/inference) adapter registry, as the factory for the `openai-responses` provider id.
+- **Pairs with:** [`@corbits/ollama-adapter`](https://github.com/corbitsdev/corbits-ollama-adapter) and [`@corbits/system-one`](https://github.com/corbitsdev/corbits-system-one), the other Corbits inference providers.
 
-For a vendor whose backend deviates from the protocol, bake its quirks into a
-factory once with `responsesAdapterFactory`:
+## Reference
 
-```ts
-import { responsesAdapterFactory } from "@corbits/openai-responses";
+| Export                                    | Description                                                                         |
+| ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| `createOpenAIResponsesAdapter`            | `AdapterFactory`. Reads quirks from the source on every resolve.                    |
+| `responsesAdapterFactory(quirks, hooks?)` | Returns an `AdapterFactory` with fixed quirks. Any per-source `quirks` are ignored. |
+| `OPENAI_RESPONSES_PROVIDER`               | The `"openai-responses"` provider id.                                               |
+| `OPENAI_COMPATIBLE_RESPONSES_PROVIDER`    | Deprecated `"openai-compatible-responses"` id from 0.1. Removed in 0.3.0.           |
+| `responsesAdapterFactories`               | Record mapping both provider ids to `createOpenAIResponsesAdapter`.                 |
+| `ResponsesQuirks`                         | Schema and type for the `quirks` object.                                            |
+| `ResponsesHooks`                          | Code hooks: `wrapSystemPrompt`, `includeReasoningEffort`.                           |
 
-export const createVendorAdapter = responsesAdapterFactory({
-  path: "/v1/responses",
-  contentShape: "flat",
-  temperature: false,
-});
-```
+### Quirks
 
-The optional second argument, `ResponsesHooks`, carries code-shaped
-accommodations (`wrapSystemPrompt`, `includeReasoningEffort`) that cannot
-live in a JSON quirks bag.
-
-## Quirks
-
-Every field is optional. An absent field keeps the protocol-native default.
-Unknown keys are rejected.
+Every field is optional. An absent field keeps the protocol default. Unknown keys are rejected.
 
 | Quirk                    | Type                                                            | Default                               | Effect on the request                                                         |
 | ------------------------ | --------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------- |
@@ -102,6 +109,52 @@ Unknown keys are rejected.
 | `reasoning.effortOption` | `string`                                                        | unset                                 | `providerOptions` key whose value is sent as `reasoning.effort`.              |
 | `instructions`           | `string`                                                        | unset                                 | Sent as `instructions`.                                                       |
 
+## Using with Interchange
+
+Interchange loads custom adapters from an operator-configured `AdapterManifest`. Add one entry per provider id you serve:
+
+```ts
+import { createDependencies, type AdapterManifest } from "@intx/inference";
+import { loadAdapterRegistry } from "@intx/inference/providers";
+
+const manifest: AdapterManifest = [
+  {
+    provider: "openai-responses",
+    specifier: "@corbits/openai-responses",
+    export: "createOpenAIResponsesAdapter",
+  },
+  {
+    provider: "openai-compatible-responses",
+    specifier: "@corbits/openai-responses",
+    export: "createOpenAIResponsesAdapter",
+  },
+];
+const deps = createDependencies(await loadAdapterRegistry(manifest));
+```
+
+Pass `deps` to `runInference`. Sources with `provider: "openai-responses"` (or the deprecated `"openai-compatible-responses"`) then resolve to this adapter, and each source's `quirks` configures its backend. To serve a vendor under its own id, add another entry with that `provider` and the same export. Manifest entries override built-in adapters with the same id, so don't reuse `openai` or another built-in id.
+
+For a vendor that needs code hooks, bake its quirks into a factory in your own module and point a manifest entry at that export:
+
+```ts
+import { responsesAdapterFactory } from "@corbits/openai-responses";
+
+export const createVendorAdapter = responsesAdapterFactory(
+  { path: "/v1/responses", contentShape: "flat", temperature: false },
+  { wrapSystemPrompt: (prompt) => `<system>${prompt}</system>` },
+);
+```
+
+Its manifest entry names your module and that export, for example `{ provider: "vendor-responses", specifier: "./vendor-adapter.js", export: "createVendorAdapter" }`.
+
+## Upgrading from 0.1
+
+- No host change is needed. `responsesAdapterFactories` still maps `openai-compatible-responses` to `createOpenAIResponsesAdapter`, so sources stored under that id keep resolving and running.
+- `OPENAI_COMPATIBLE_RESPONSES_PROVIDER` is deprecated and removed in 0.3.0. Move stored sources to `openai-responses` before then.
+- `isResponsesStreamTerminal` is no longer exported. The adapter still applies it.
+- `@intx/inference` and `@intx/types` peers are now `^0.4.0`.
+- Quirks and reasoning signatures are unchanged.
+
 ## License
 
-LGPL-2.1-only.
+[LGPL-2.1-only](https://github.com/corbitsdev/corbits-openai-responses/blob/main/LICENSE)
