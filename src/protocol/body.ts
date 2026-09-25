@@ -379,8 +379,10 @@ export function buildResponsesRequest(
     // is a wire contract to depend on.
     accept: quirks.stream ? "text/event-stream" : "application/json",
     authorization: BEARER_CREDENTIAL_SENTINEL,
-    ...quirks.headers.static,
   };
+  for (const [name, value] of Object.entries(quirks.headers.static)) {
+    headers[name] = value;
+  }
   if (quirks.headers.modelHeader !== undefined) {
     headers[quirks.headers.modelHeader] = model;
   }
