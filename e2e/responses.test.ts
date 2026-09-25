@@ -17,7 +17,7 @@ import {
   OPENAI_COMPATIBLE_RESPONSES_PROVIDER,
   OPENAI_RESPONSES_PROVIDER,
   responsesAdapterFactories,
-} from "./index";
+} from "../src/index";
 
 // Narrows the replayed request body for the reasoning-replay assertion below
 // without an `as` cast on data that came off a real `Request`.

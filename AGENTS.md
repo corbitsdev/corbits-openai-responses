@@ -24,7 +24,10 @@ re-exports plus the provider ids and factory record:
 - `src/index.ts` — re-exports of the above plus the two provider-id
   constants (`OPENAI_COMPATIBLE_RESPONSES_PROVIDER` is deprecated, removed
   in 0.3.0) and `responsesAdapterFactories`.
-- `*.test.ts` next to the source they cover.
+- `src/*.test.ts` — unit tests for the wire codec and parser, excluded from
+  the build.
+- `e2e/` — `runInference` through `@intx/inference-testing`, plus the
+  opt-in live suite (`OPENAI_RESPONSES_LIVE_URL`).
 
 ## Rules
 
