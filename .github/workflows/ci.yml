@@ -7,20 +7,21 @@ on:
 
 jobs:
   check:
-    name: check (node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [24]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 24
       - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
       - run: bun install --frozen-lockfile
       - run: bun run check
+      - name: node consumer smoke
+        run: |
+          set -euo pipefail
+          TARBALL="$PWD/$(npm pack --silent)"
+          mkdir -p "$RUNNER_TEMP/c" && cd "$RUNNER_TEMP/c"
+          npm init -y >/dev/null && npm pkg set type=module >/dev/null
+          npm install "$TARBALL"
+          node -e 'import("@corbits/openai-responses").then((m) => { for (const n of ["createOpenAIResponsesAdapter", "responsesAdapterFactory"]) if (typeof m[n] !== "function") throw new Error("missing export: " + n); })'
