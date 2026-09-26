@@ -1,6 +1,8 @@
 node_modules/
 dist/
-.corbits/
-.DS_Store
+*.tsbuildinfo
+*.tgz
+coverage/
 .env
 .env.*
+.DS_Store
