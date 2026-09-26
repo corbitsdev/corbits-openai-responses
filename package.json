@@ -26,9 +26,9 @@
     "build": "tsc -p tsconfig.build.json",
     "prepack": "bun run build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "lint": "oxlint",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "test": "bun test",
     "test:e2e": "bun test e2e",
     "check": "bun run typecheck && bun run lint && bun run format:check && bun run test"
@@ -41,16 +41,13 @@
     "@intx/types": "^0.4.0"
   },
   "devDependencies": {
-    "@eslint/js": "10.0.1",
     "@intx/inference": "0.4.0",
     "@intx/inference-testing": "0.4.0",
     "@intx/types": "0.4.0",
     "@types/bun": "1.3.14",
-    "eslint": "10.10.0",
-    "jiti": "2.7.0",
-    "prettier": "3.9.6",
-    "typescript": "6.0.3",
-    "typescript-eslint": "8.69.0"
+    "oxfmt": "0.70.0",
+    "oxlint": "1.85.0",
+    "typescript": "6.0.3"
   },
   "engines": {
     "bun": ">=1.2.0",
