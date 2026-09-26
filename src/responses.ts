@@ -255,7 +255,7 @@ function buildAdapter(
     responseBody,
   ) => parseJSONResponse(responseBody, source);
   // Declared as a plain const rather than a typed object literal: the
-  // `ProviderAdapter` type in `@intx/inference` 0.3.0 has no
+  // `ProviderAdapter` type in `@intx/inference` 0.4.0 has no
   // `isStreamTerminal` field, so a literal typed as `ProviderAdapter` here
   // would fail an excess-property check. Returning a widened variable
   // instead lets a host running the semantic-terminal harness patch read
