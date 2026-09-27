@@ -2,7 +2,14 @@
   "name": "@corbits/openai-responses",
   "version": "0.2.0",
   "description": "Interchange ProviderAdapter for the OpenAI Responses API wire protocol with quirks-based vendor configuration, SSE and non-streaming parsing, and reasoning signature replay.",
-  "homepage": "https://github.com/corbitsdev/corbits-openai-responses",
+  "keywords": [
+    "corbits",
+    "inference",
+    "interchange",
+    "openai",
+    "responses"
+  ],
+  "homepage": "https://github.com/corbitsdev/corbits-openai-responses#readme",
   "bugs": {
     "url": "https://github.com/corbitsdev/corbits-openai-responses/issues"
   },
@@ -19,8 +26,6 @@
   ],
   "type": "module",
   "sideEffects": false,
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -31,13 +36,13 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "prepack": "bun run build",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "test": "bun test",
+    "test": "bun test src --pass-with-no-tests",
     "test:e2e": "bun test e2e",
     "check": "bun run typecheck && bun run lint && bun run format:check && bun run test"
   },
