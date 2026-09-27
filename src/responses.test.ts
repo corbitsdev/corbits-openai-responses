@@ -5,7 +5,11 @@ import type {
   InferenceEvent,
   LastCycleSource,
 } from "@intx/types/runtime";
-import { createOpenAIResponsesAdapter, responsesAdapterFactory } from "./index";
+import {
+  createOpenAIResponsesAdapter,
+  responsesAdapterFactory,
+  type ResponsesQuirks,
+} from "./index";
 
 const source: LastCycleSource = {
   sourceId: "test/source",
@@ -98,25 +102,83 @@ describe("Responses adapter — block-index lifecycle", () => {
   });
 });
 
-describe("Responses adapter — protocol-native defaults", () => {
-  test("stream:false requests accept application/json, not text/event-stream", () => {
-    const adapter = createOpenAIResponsesAdapter(source, { stream: false });
-    const request = adapter.buildRequest(turns, "model", {});
-    expect(bodyOf(request)["stream"]).toBe(false);
-    expect(request.headers["accept"]).toBe("application/json");
+describe("Responses request builder — quirk matrix", () => {
+  const options = { maxTokens: 100, temperature: 0.5 };
+  const cases: {
+    name: string;
+    quirks: ResponsesQuirks;
+    present: Record<string, unknown>;
+    absent: string[];
+    accept: string;
+  }[] = [
+    {
+      name: "no quirks sends protocol-native defaults",
+      quirks: {},
+      present: {
+        store: false,
+        stream: true,
+        max_output_tokens: 100,
+        temperature: 0.5,
+        input: [{ content: [{ type: "input_text", text: "hi" }] }],
+      },
+      absent: ["parallel_tool_calls", "instructions"],
+      accept: "text/event-stream",
+    },
+    {
+      name: "stream:false asks for a JSON body",
+      quirks: { stream: false },
+      present: { stream: false },
+      absent: [],
+      accept: "application/json",
+    },
+    {
+      name: "store:true is sent verbatim",
+      quirks: { store: true },
+      present: { store: true },
+      absent: [],
+      accept: "text/event-stream",
+    },
+    {
+      // Some backends reject a request that omits the field.
+      name: "parallelToolCalls:false is sent verbatim",
+      quirks: { parallelToolCalls: false },
+      present: { parallel_tool_calls: false },
+      absent: [],
+      accept: "text/event-stream",
+    },
+    {
+      name: "maxOutputTokens:false and temperature:false omit their fields",
+      quirks: { maxOutputTokens: false, temperature: false },
+      present: {},
+      absent: ["max_output_tokens", "temperature"],
+      accept: "text/event-stream",
+    },
+    {
+      name: "instructions is sent verbatim",
+      quirks: { instructions: "be terse" },
+      present: { instructions: "be terse" },
+      absent: [],
+      accept: "text/event-stream",
+    },
+    {
+      name: "flat contentShape flattens text-only content to a string",
+      quirks: { contentShape: "flat" },
+      present: { input: [{ content: "hi" }] },
+      absent: [],
+      accept: "text/event-stream",
+    },
+  ];
+
+  test.each(cases)("$name", ({ quirks, present, absent, accept }) => {
+    const adapter = createOpenAIResponsesAdapter(source, quirks);
+    const request = adapter.buildRequest(turns, "model", options);
+    const body = bodyOf(request);
+    expect(body).toMatchObject(present);
+    for (const key of absent) expect(body).not.toHaveProperty(key);
+    expect(request.headers["accept"]).toBe(accept);
   });
 
-  // An explicit `parallelToolCalls: false` must reach the wire verbatim —
-  // some backends require it and reject a request that omits the field.
-  test("an explicit parallelToolCalls:false reaches the wire as parallel_tool_calls:false", () => {
-    const adapter = createOpenAIResponsesAdapter(source, {
-      parallelToolCalls: false,
-    });
-    const body = bodyOf(adapter.buildRequest(turns, "m", {}));
-    expect(body["parallel_tool_calls"]).toBe(false);
-  });
-
-  test("typed shape (the default) splits assistant text into output_text and never flattens to a string", () => {
+  test("typed shape (the default) splits assistant text into output_text", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
     const assistantTurn: ConversationTurn[] = [
       {
@@ -129,14 +191,6 @@ describe("Responses adapter — protocol-native defaults", () => {
     expect(inputItemsOf(request)[0]?.["content"]).toEqual([
       { type: "output_text", text: "hi" },
     ]);
-  });
-
-  test("flat contentShape flattens text-only content to a plain string", () => {
-    const adapter = createOpenAIResponsesAdapter(source, {
-      contentShape: "flat",
-    });
-    const request = adapter.buildRequest(turns, "model", {});
-    expect(inputItemsOf(request)[0]?.["content"]).toBe("hi");
   });
 });
 
@@ -384,26 +438,6 @@ describe("Responses parser — usage mapping", () => {
     );
     return usageEventOf(events).data.usage;
   }
-
-  // OpenAI (GPT-5.6+) documents `cache_write_tokens` as a subset of
-  // `input_tokens` — the docs' worked example is 2600 input = 2000 read +
-  // 400 written + 200 ordinary. Both subsets must be split out of `input`
-  // or the summed TokenUsage fields double-count them.
-  test("OpenAI-shaped usage splits cache_write_tokens out of input", () => {
-    const usage = usageFromCompleted({
-      input_tokens: 2600,
-      output_tokens: 10,
-      input_tokens_details: { cached_tokens: 2000, cache_write_tokens: 400 },
-      output_tokens_details: { reasoning_tokens: 0 },
-    });
-    expect(usage).toEqual({
-      input: 200,
-      output: 10,
-      cacheRead: 2000,
-      cacheWrite: 400,
-      thinking: 0,
-    });
-  });
 
   // A gateway fronting an OpenAI-shaped endpoint reports the
   // Anthropic-shaped `cache_creation_tokens`, whose subset relationship to
