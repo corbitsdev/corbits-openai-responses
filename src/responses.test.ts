@@ -178,6 +178,18 @@ describe("Responses request builder — quirk matrix", () => {
     expect(request.headers["accept"]).toBe(accept);
   });
 
+  test("static headers override defaults and per-request headers override static ones", () => {
+    const adapter = createOpenAIResponsesAdapter(source, {
+      headers: {
+        static: { accept: "application/x-ndjson", "x-model": "static" },
+        modelHeader: "x-model",
+      },
+    });
+    const { headers } = adapter.buildRequest(turns, "m", {});
+    expect(headers["accept"]).toBe("application/x-ndjson");
+    expect(headers["x-model"]).toBe("m");
+  });
+
   test("typed shape (the default) splits assistant text into output_text", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
     const assistantTurn: ConversationTurn[] = [
