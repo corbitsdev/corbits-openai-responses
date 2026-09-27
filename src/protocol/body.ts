@@ -138,9 +138,10 @@ function toResponsesContentPart(
 }
 
 // Map one internal turn to zero or more Responses items. Reasoning blocks
-// are echoed back only when they carry the opaque `encrypted_content` the
-// backend issued AND that backend is the one this request is going to —
-// replaying it to a different provider gets a 400 it cannot recover from.
+// are echoed back only when their signature was issued by this provider for
+// the requested model; otherwise only the reasoning item is dropped, and the
+// function_call items it preceded are kept so each function_call_output
+// still has its call.
 function toResponsesItems(
   turn: ConversationTurn,
   requestModel: string,
@@ -155,15 +156,6 @@ function toResponsesItems(
       : "input_text";
   const parts: ResponsesContentPart[] = [];
   let hasNonTextPart = false;
-  // A reasoning block whose signature could not be replayed (foreign
-  // provider, model switch, or a missing/untagged signature) leaves any
-  // function_call it produced without the reasoning item the Responses API
-  // expects to precede it — the exact orphaned shape that degenerates
-  // reasoning models. Suppress function_call items until the next text or
-  // successfully-replayed reasoning item re-establishes a clean turn shape;
-  // tool results are unaffected since they never need a preceding reasoning
-  // item.
-  let suppressOrphanedCalls = false;
 
   const flush = (): void => {
     if (parts.length === 0) return;
@@ -174,12 +166,10 @@ function toResponsesItems(
     items.push({ type: "message", role, content });
     parts.length = 0;
     hasNonTextPart = false;
-    suppressOrphanedCalls = false;
   };
 
   for (const block of turn.content) {
     if (block.type === "tool_call") {
-      if (suppressOrphanedCalls) continue;
       flush();
       items.push({
         type: "function_call",
@@ -191,7 +181,6 @@ function toResponsesItems(
     }
     if (block.type === "tool_result") {
       flush();
-      suppressOrphanedCalls = false;
       items.push({
         type: "function_call_output",
         call_id: block.callId,
@@ -209,16 +198,12 @@ function toResponsesItems(
         requestProvider,
         block.signature,
       );
-      if (encryptedContent !== undefined) {
+      if (encryptedContent !== undefined)
         items.push({
           type: "reasoning",
           summary: [],
           encrypted_content: encryptedContent,
         });
-        suppressOrphanedCalls = false;
-      } else {
-        suppressOrphanedCalls = true;
-      }
       continue;
     }
     const part = toResponsesContentPart(block, textKind);
