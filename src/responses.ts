@@ -123,29 +123,46 @@ function parseResponsesQuirks(raw: unknown): ResolvedResponsesQuirks {
       `openai-responses adapter: invalid quirks: ${validated.summary}`,
     );
   }
-  // Header names are case-insensitive; lowercasing lets a static header
+  // Header names are case-insensitive; lowercasing lets a quirk header
   // override the stock lowercase ones instead of being sent alongside them.
-  // The credential header is never static, so a persisted bag cannot
-  // replace the sentinel the harness swaps for the real credential.
-  const staticHeaders: Record<string, string> = {};
-  for (const [name, value] of Object.entries(validated.headers?.static ?? {})) {
+  // No quirk may name the credential header, so neither a persisted bag nor
+  // a caller's providerOptions can replace the sentinel the harness swaps
+  // for the real credential.
+  function headerName(field: string, name: string): string {
     const lower = name.toLowerCase();
     if (lower === "authorization") {
       throw new Error(
-        "openai-responses adapter: invalid quirks: headers.static must not set authorization",
+        `openai-responses adapter: invalid quirks: ${field} must not set authorization`,
       );
     }
-    staticHeaders[lower] = value;
+    return lower;
   }
+  const staticHeaders: Record<string, string> = {};
+  for (const [name, value] of Object.entries(validated.headers?.static ?? {})) {
+    staticHeaders[headerName("headers.static", name)] = value;
+  }
+  const modelHeader = validated.headers?.modelHeader;
+  const sessionIdHeader = validated.sessionIdHeader;
   return {
     path: validated.path ?? "/responses",
     headers: {
       static: staticHeaders,
-      modelHeader: validated.headers?.modelHeader,
-      fromOption: validated.headers?.fromOption ?? [],
+      modelHeader:
+        modelHeader === undefined
+          ? undefined
+          : headerName("headers.modelHeader", modelHeader),
+      fromOption: (validated.headers?.fromOption ?? []).map(
+        ({ optionKey, header }) => ({
+          optionKey,
+          header: headerName("headers.fromOption", header),
+        }),
+      ),
     },
     sessionIdOption: validated.sessionIdOption,
-    sessionIdHeader: validated.sessionIdHeader,
+    sessionIdHeader:
+      sessionIdHeader === undefined
+        ? undefined
+        : headerName("sessionIdHeader", sessionIdHeader),
     // Protocol-native behaviour always sends the caller's system prompt as a
     // plain `system` message; a vendor whose backend addresses it
     // differently (Codex: `developer` role, parts shape) overrides this

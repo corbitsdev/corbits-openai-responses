@@ -207,6 +207,55 @@ describe("Responses request builder — quirk matrix", () => {
     ).toThrow("headers.static must not set authorization");
   });
 
+  test.each([
+    ["headers.modelHeader", { headers: { modelHeader: "authorization" } }],
+    ["headers.modelHeader", { headers: { modelHeader: "AUTHORIZATION" } }],
+    [
+      "headers.fromOption",
+      {
+        headers: { fromOption: [{ optionKey: "k", header: "authorization" }] },
+      },
+    ],
+    [
+      "headers.fromOption",
+      {
+        headers: { fromOption: [{ optionKey: "k", header: "Authorization" }] },
+      },
+    ],
+    [
+      "sessionIdHeader",
+      { sessionIdOption: "sid", sessionIdHeader: "authorization" },
+    ],
+    [
+      "sessionIdHeader",
+      { sessionIdOption: "sid", sessionIdHeader: "Authorization" },
+    ],
+  ])("%s may not target authorization", (field, quirks) => {
+    expect(() => createOpenAIResponsesAdapter(source, quirks)).toThrow(
+      `${field} must not set authorization`,
+    );
+  });
+
+  test("dynamic header names are lowercased", () => {
+    const adapter = createOpenAIResponsesAdapter(source, {
+      headers: {
+        modelHeader: "X-Model",
+        fromOption: [{ optionKey: "k", header: "X-Tenant" }],
+      },
+      sessionIdOption: "sid",
+      sessionIdHeader: "Session_ID",
+    });
+    const { headers } = adapter.buildRequest(turns, "m", {
+      providerOptions: { k: "t", sid: "s" },
+    });
+    expect(headers["x-model"]).toBe("m");
+    expect(headers["x-tenant"]).toBe("t");
+    expect(headers["session_id"]).toBe("s");
+    expect(Object.keys(headers)).toEqual(
+      Object.keys(headers).map((name) => name.toLowerCase()),
+    );
+  });
+
   test("typed shape (the default) splits assistant text into output_text", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
     const assistantTurn: ConversationTurn[] = [
