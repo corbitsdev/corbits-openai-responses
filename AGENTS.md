@@ -9,15 +9,18 @@ session-id routing, request-body switches) are config, not forked code.
 ## Layout
 
 `src/responses.ts` mirrors Interchange's own OpenAI Chat Completions adapter
-section order in one file — quirks schema + resolver → request building →
-event schemas → streaming parse → JSON parse → header extractors → factory.
+section order — quirks schema + resolver → event schemas → streaming parse →
+JSON parse → header extractors → factory. Request building lives under
+`src/protocol/`, following Interchange's `inference-discovery-openai` layout.
 `src/index.ts` is re-exports plus registry-shaped values:
 
-- `src/responses.ts` — everything: `ResponsesQuirks` and its resolver,
-  `ResponsesHooks`, request building, event schemas, SSE streaming parse,
-  non-streaming JSON parse, block indexing, terminal-event detection, the
-  rate-limit header extractors, reasoning `encrypted_content` tag/replay,
-  and `createOpenAIResponsesAdapter` / `responsesAdapterFactory`.
+- `src/responses.ts` — `ResponsesQuirks` and its resolver, `ResponsesHooks`,
+  event schemas, SSE streaming parse, non-streaming JSON parse, block
+  indexing, terminal-event detection, the rate-limit header extractors, and
+  `createOpenAIResponsesAdapter` / `responsesAdapterFactory`.
+- `src/protocol/body.ts` — `buildResponsesRequest` with its content, tool,
+  system-prompt, and reasoning helpers, plus reasoning `encrypted_content`
+  signature tag/replay.
 - `src/index.ts` — re-exports of the above plus the two provider-id
   constants and `responsesAdapterFactories`.
 - `*.test.ts` next to the source they cover.
@@ -34,13 +37,15 @@ event schemas → streaming parse → JSON parse → header extractors → facto
   `undefined` to one.
 - No product strings baked in — anything vendor-specific is a config field
   the caller supplies.
-- Public surface is `src/index.ts`'s export list only: `createOpenAIResponsesAdapter`,
-  `responsesAdapterFactory`, `responsesAdapterFactories`, `ResponsesQuirks`,
-  `ResponsesHooks`, `isResponsesStreamTerminal`, and the two provider-id
-  constants. Everything else in `src/responses.ts` (`parseResponse`,
-  `parseJSONResponse`, block indexing, signature tag/replay, the resolved
-  quirks type) is module-private. Tests go through the public factory only —
-  never import `./responses` directly from a test.
+- Public surface is `src/index.ts`'s export list only:
+  `createOpenAIResponsesAdapter`, `responsesAdapterFactory`,
+  `responsesAdapterFactories`, `ResponsesQuirks`, `ResponsesHooks`,
+  `isResponsesStreamTerminal`, and the two provider-id constants.
+  Everything else in `src/responses.ts` and `src/protocol/`
+  (`parseResponse`, `parseJSONResponse`, block indexing, signature
+  tag/replay, the resolved quirks type) is module-private. Tests go through
+  the public factory only — never import `./responses` directly from a
+  test.
 - Tests only for load-bearing risk (wire-format encoding, state machines,
   hostile-input parsing) — not for trivial mapping or "returns what I passed
   in".
