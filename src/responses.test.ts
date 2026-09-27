@@ -190,6 +190,23 @@ describe("Responses request builder — quirk matrix", () => {
     expect(headers["x-model"]).toBe("m");
   });
 
+  test("static header names are lowercased so they replace the stock headers", () => {
+    const adapter = createOpenAIResponsesAdapter(source, {
+      headers: { static: { Accept: "application/x-ndjson" } },
+    });
+    const { headers } = adapter.buildRequest(turns, "m", {});
+    expect(headers["accept"]).toBe("application/x-ndjson");
+    expect(headers).not.toHaveProperty("Accept");
+  });
+
+  test("a static authorization header is rejected in any case", () => {
+    expect(() =>
+      createOpenAIResponsesAdapter(source, {
+        headers: { static: { Authorization: "Bearer leaked" } },
+      }),
+    ).toThrow("headers.static must not set authorization");
+  });
+
   test("typed shape (the default) splits assistant text into output_text", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
     const assistantTurn: ConversationTurn[] = [
