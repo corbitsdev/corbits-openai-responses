@@ -123,10 +123,24 @@ function parseResponsesQuirks(raw: unknown): ResolvedResponsesQuirks {
       `openai-responses adapter: invalid quirks: ${validated.summary}`,
     );
   }
+  // Header names are case-insensitive; lowercasing lets a static header
+  // override the stock lowercase ones instead of being sent alongside them.
+  // The credential header is never static, so a persisted bag cannot
+  // replace the sentinel the harness swaps for the real credential.
+  const staticHeaders: Record<string, string> = {};
+  for (const [name, value] of Object.entries(validated.headers?.static ?? {})) {
+    const lower = name.toLowerCase();
+    if (lower === "authorization") {
+      throw new Error(
+        "openai-responses adapter: invalid quirks: headers.static must not set authorization",
+      );
+    }
+    staticHeaders[lower] = value;
+  }
   return {
     path: validated.path ?? "/responses",
     headers: {
-      static: validated.headers?.static ?? {},
+      static: staticHeaders,
       modelHeader: validated.headers?.modelHeader,
       fromOption: validated.headers?.fromOption ?? [],
     },
