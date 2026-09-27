@@ -381,6 +381,57 @@ describe("Responses request builder — tool-item dedupe", () => {
   });
 });
 
+describe("Responses request builder — un-replayable reasoning", () => {
+  const history = (model: string, signature: string): ConversationTurn[] => [
+    { role: "user", timestamp: 0, content: [{ type: "text", text: "hi" }] },
+    {
+      role: "assistant",
+      model,
+      timestamp: 1,
+      content: [
+        { type: "thinking", thinking: "", signature },
+        { type: "tool_call", id: "call_1", name: "lookup", arguments: {} },
+      ],
+    },
+    {
+      role: "user",
+      timestamp: 2,
+      content: [
+        {
+          type: "tool_result",
+          callId: "call_1",
+          content: [{ type: "text", text: "42" }],
+        },
+      ],
+    },
+  ];
+
+  test.each([
+    {
+      name: "saved with another model",
+      model: "other-model",
+      tag: "test-provider",
+    },
+    {
+      name: "tagged for another provider",
+      model: "model",
+      tag: "other-provider",
+    },
+  ])("$name drops only the reasoning item", ({ model, tag }) => {
+    const adapter = createOpenAIResponsesAdapter(source, {});
+    const request = adapter.buildRequest(
+      history(model, `${tag}:CIPHER`),
+      "model",
+      {},
+    );
+    expect(inputItemsOf(request).map((item) => item["type"])).toEqual([
+      "message",
+      "function_call",
+      "function_call_output",
+    ]);
+  });
+});
+
 describe("Responses request builder — tool-name codec", () => {
   // The Responses function-name charset is a hard 64-char wire limit; an
   // over-length or non-conforming internal tool name must be encoded, not
