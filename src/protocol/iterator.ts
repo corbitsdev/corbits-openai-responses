@@ -70,6 +70,9 @@ const CompletedEvent = type({ response: { "usage?": ResponsesUsage } });
 const FailedEvent = type({
   "response?": { "error?": { "message?": "string" } },
 });
+const IncompleteEvent = type({
+  response: { "incomplete_details?": { "reason?": "string" } },
+});
 const ErrorEvent = type({ "message?": "string" });
 
 // Maps the Responses API's usage object onto the internal TokenUsage,
@@ -459,6 +462,24 @@ export function parseResponse(
       const message = validated.response?.error?.message ?? "response failed";
       throw new ProtocolMismatchError(`${provider}: ${message}`, parsed);
     }
+    // Throws like parseJSONResponse does for status "incomplete". The
+    // harness drops the events of a batch that throws, so this event's usage
+    // cannot also be reported.
+    case "response.incomplete": {
+      const validated = IncompleteEvent(parsed);
+      if (validated instanceof type.errors) {
+        throw protocolMismatch(
+          provider,
+          `response.incomplete failed schema validation: ${validated.summary}`,
+          parsed,
+        );
+      }
+      throw protocolMismatch(
+        provider,
+        `response status is "incomplete": ${validated.response.incomplete_details?.reason ?? "no reason given"}`,
+        parsed,
+      );
+    }
     case "error": {
       const validated = ErrorEvent(parsed);
       if (validated instanceof type.errors) {
@@ -475,7 +496,7 @@ export function parseResponse(
     }
     default:
       // Lifecycle envelopes (response.created, response.in_progress,
-      // content_part.*, *_text.done, response.incomplete) carry no
+      // content_part.*, *_text.done) carry no
       // incremental payload a caller needs; ignore them. Unknown event
       // types are protocol-legal — the vocabulary is expected to grow.
       return events;
