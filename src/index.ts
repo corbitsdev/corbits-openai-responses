@@ -1,7 +1,7 @@
 import type { AdapterFactory } from "@intx/inference";
+import { isResponsesStreamTerminal } from "./protocol/iterator.js";
 import {
   createOpenAIResponsesAdapter,
-  isResponsesStreamTerminal,
   responsesAdapterFactory,
   ResponsesQuirks,
 } from "./responses.js";

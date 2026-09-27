@@ -8,19 +8,19 @@ session-id routing, request-body switches) are config, not forked code.
 
 ## Layout
 
-`src/responses.ts` mirrors Interchange's own OpenAI Chat Completions adapter
-section order — quirks schema + resolver → event schemas → streaming parse →
-JSON parse → header extractors → factory. Request building lives under
-`src/protocol/`, following Interchange's `inference-discovery-openai` layout.
-`src/index.ts` is re-exports plus registry-shaped values:
+`src/responses.ts` holds the quirks schema + resolver, the header
+extractors, and the factory that wires `src/protocol/` together, following
+Interchange's `inference-discovery-openai` layout. `src/index.ts` is
+re-exports plus registry-shaped values:
 
 - `src/responses.ts` — `ResponsesQuirks` and its resolver, `ResponsesHooks`,
-  event schemas, SSE streaming parse, non-streaming JSON parse, block
-  indexing, terminal-event detection, the rate-limit header extractors, and
-  `createOpenAIResponsesAdapter` / `responsesAdapterFactory`.
+  the rate-limit header extractors, and `createOpenAIResponsesAdapter` /
+  `responsesAdapterFactory`.
 - `src/protocol/body.ts` — `buildResponsesRequest` with its content, tool,
   system-prompt, and reasoning helpers, plus reasoning `encrypted_content`
   signature tag/replay.
+- `src/protocol/iterator.ts` — event schemas, SSE streaming parse,
+  non-streaming JSON parse, block indexing, and terminal-event detection.
 - `src/index.ts` — re-exports of the above plus the two provider-id
   constants and `responsesAdapterFactories`.
 - `*.test.ts` next to the source they cover.
