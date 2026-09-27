@@ -25,7 +25,7 @@ event schemas → streaming parse → JSON parse → header extractors → facto
 ## Rules
 
 - Consume `@intx/inference` and `@intx/types` as `peerDependencies`
-  (`>=0.3.0`), pinned `0.3.0` in `devDependencies` for typecheck — never
+  (`^0.4.0`), pinned `0.4.0` in `devDependencies` for typecheck — never
   vendor, never `workspace:`. A host must resolve exactly one copy; a second
   copy breaks `instanceof ProtocolMismatchError`.
 - Parse every trust boundary (the `quirks` bag, every `response.*` SSE event,
