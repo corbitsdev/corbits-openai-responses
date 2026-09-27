@@ -239,6 +239,30 @@ describe("openai-responses adapter through runInference", () => {
     expect(error.data.error.message).toContain("backend exploded");
   });
 
+  test("response.incomplete surfaces its reason as a protocol_mismatch inference.error", async () => {
+    harness = setupHarness({ adapters: registry });
+    const stream = harness.scenario.createStream();
+    harness.scenario.whenRequestMatches(() => true, stream);
+    stream.enqueueAll(
+      [
+        sse({
+          type: "response.incomplete",
+          response: {
+            status: "incomplete",
+            incomplete_details: { reason: "max_output_tokens" },
+            usage: { input_tokens: 10, output_tokens: 100 },
+          },
+        }),
+      ],
+      { startAt: 1 },
+    );
+    const events = await collect(harness, [userTurn("hi")]);
+    expect(events.some((e) => e.type === "inference.done")).toBe(false);
+    const error = errorEvent(events);
+    expect(error.data.error.category).toBe("protocol_mismatch");
+    expect(error.data.error.message).toContain("max_output_tokens");
+  });
+
   test("a prior signed reasoning turn replays as a reasoning item ahead of its function_call", async () => {
     harness = setupHarness({ adapters: registry });
     const stream = harness.scenario.createStream();
