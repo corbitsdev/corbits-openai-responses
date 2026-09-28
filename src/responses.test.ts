@@ -360,9 +360,9 @@ describe("Responses parser — event schema validation", () => {
   // A truncated turn is still a turn: the backend stopped (often on
   // max_output_tokens) after emitting usable deltas. Surfacing that as a
   // protocol mismatch drops the partial content the stream already
-  // delivered, so the envelope is validated and then ignored — terminal
-  // handling lives in isStreamTerminal, and no usage is reported.
-  test("response.incomplete validates and returns no events instead of throwing", () => {
+  // delivered, so the envelope reports its usage like response.completed
+  // does — terminal handling lives in isStreamTerminal.
+  test("response.incomplete reports usage instead of throwing", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
     adapter.buildRequest(turns, "model", {});
     const delta = JSON.stringify({
@@ -379,7 +379,8 @@ describe("Responses parser — event schema validation", () => {
         usage: { input_tokens: 10, output_tokens: 100 },
       },
     });
-    expect(adapter.parseResponse(incomplete)).toEqual([]);
+    const events = adapter.parseResponse(incomplete);
+    expect(events.map((e) => e.type)).toEqual(["inference.usage"]);
   });
 
   // A function_call_arguments.delta is only routable to the tool_call.start
@@ -417,9 +418,9 @@ describe("Responses parser — non-streaming failure states", () => {
   });
 
   // A truncated body still carries the partial turn the backend managed
-  // to produce; throwing on it would discard usable content, so the output
-  // decodes normally while the (partial, unreliable) usage is withheld.
-  test("decodes partial output and reports no usage on status:incomplete", () => {
+  // to produce; throwing on it would discard usable content, so it decodes
+  // like a completed one, usage included.
+  test("decodes partial output and usage on status:incomplete", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
     const incomplete = JSON.stringify({
       output: [
@@ -436,7 +437,7 @@ describe("Responses parser — non-streaming failure states", () => {
     expect(
       events.filter((e) => e.type === "inference.text.delta"),
     ).toHaveLength(1);
-    expect(events.some((e) => e.type === "inference.usage")).toBe(false);
+    expect(events.some((e) => e.type === "inference.usage")).toBe(true);
   });
 
   test("throws on a response missing the required output field", () => {

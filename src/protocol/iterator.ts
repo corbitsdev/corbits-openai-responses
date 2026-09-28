@@ -71,7 +71,10 @@ const FailedEvent = type({
   "response?": { "error?": { "message?": "string" } },
 });
 const IncompleteEvent = type({
-  response: { "incomplete_details?": { "reason?": "string" } },
+  response: {
+    "incomplete_details?": { "reason?": "string" },
+    "usage?": ResponsesUsage,
+  },
 });
 const ErrorEvent = type({ "message?": "string" });
 
@@ -464,10 +467,9 @@ export function parseResponse(
     }
     // A truncated turn is still a turn: the backend stopped (often on
     // max_output_tokens) after emitting usable deltas, and those deltas were
-    // already delivered as events by earlier envelopes. The envelope is
-    // validated so a malformed one still throws, then ignored — terminal
-    // handling lives in isResponsesStreamTerminal, and the (partial,
-    // unreliable) usage is deliberately not reported.
+    // already delivered as events by earlier envelopes. Terminal handling
+    // lives in isResponsesStreamTerminal; the usage is what the backend
+    // bills for the partial turn, so it is reported like a completed one.
     case "response.incomplete": {
       const validated = IncompleteEvent(parsed);
       if (validated instanceof type.errors) {
@@ -476,6 +478,13 @@ export function parseResponse(
           `response.incomplete failed schema validation: ${validated.summary}`,
           parsed,
         );
+      }
+      if (validated.response.usage !== undefined) {
+        events.push({
+          type: "inference.usage",
+          seq,
+          data: { usage: toInferenceUsage(validated.response.usage), source },
+        });
       }
       return events;
     }
@@ -614,10 +623,8 @@ export function parseJSONResponse(
     );
   }
   // A truncated body still carries the partial turn the backend managed
-  // to produce; throwing on it would discard usable content. The output
-  // decodes normally below while the (partial, unreliable) usage is
-  // withheld.
-  const incomplete = response.status === "incomplete";
+  // to produce; throwing on it would discard usable content, so status
+  // "incomplete" decodes like a completed one.
 
   const seq = 0;
   const events: InferenceEvent[] = [];
@@ -743,13 +750,11 @@ export function parseJSONResponse(
     // has nothing to do with; ignored, mirroring the SSE default case.
   }
 
-  if (!incomplete) {
-    events.push({
-      type: "inference.usage",
-      seq,
-      data: { usage: toInferenceUsage(response.usage), source },
-    });
-  }
+  events.push({
+    type: "inference.usage",
+    seq,
+    data: { usage: toInferenceUsage(response.usage), source },
+  });
 
   return events;
 }

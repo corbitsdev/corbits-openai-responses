@@ -241,8 +241,8 @@ describe("openai-responses adapter through runInference", () => {
 
   // A truncated stream is a terminal turn with the partial content the
   // backend managed to emit, not a protocol violation: the deltas already
-  // delivered stay, the turn ends, and no usage is reported.
-  test("response.incomplete ends the turn with its partial text and no usage", async () => {
+  // delivered stay, the turn ends, and the billed usage is reported.
+  test("response.incomplete ends the turn with its partial text and usage", async () => {
     harness = setupHarness({ adapters: registry });
     const stream = harness.scenario.createStream();
     harness.scenario.whenRequestMatches(() => true, stream);
@@ -269,13 +269,7 @@ describe("openai-responses adapter through runInference", () => {
     const done = doneEvent(events);
     const texts = done.data.turn.content.filter((b) => b.type === "text");
     expect(texts.map((b) => b.text)).toEqual(["partial"]);
-    expect(done.data.usage).toEqual({
-      input: 0,
-      output: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-      thinking: 0,
-    });
+    expect(done.data.usage).toMatchObject({ input: 10, output: 100 });
   });
 
   test("a prior signed reasoning turn replays as a reasoning item ahead of its function_call", async () => {
