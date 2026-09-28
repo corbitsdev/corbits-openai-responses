@@ -357,6 +357,31 @@ describe("Responses parser — event schema validation", () => {
     ).toEqual([]);
   });
 
+  // A truncated turn is still a turn: the backend stopped (often on
+  // max_output_tokens) after emitting usable deltas. Surfacing that as a
+  // protocol mismatch drops the partial content the stream already
+  // delivered, so the envelope is validated and then ignored — terminal
+  // handling lives in isStreamTerminal, and no usage is reported.
+  test("response.incomplete validates and returns no events instead of throwing", () => {
+    const adapter = createOpenAIResponsesAdapter(source, {});
+    adapter.buildRequest(turns, "model", {});
+    const delta = JSON.stringify({
+      type: "response.output_text.delta",
+      item_id: "item_1",
+      delta: "partial",
+    });
+    expect(adapter.parseResponse(delta)).toHaveLength(1);
+    const incomplete = JSON.stringify({
+      type: "response.incomplete",
+      response: {
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" },
+        usage: { input_tokens: 10, output_tokens: 100 },
+      },
+    });
+    expect(adapter.parseResponse(incomplete)).toEqual([]);
+  });
+
   // A function_call_arguments.delta is only routable to the tool_call.start
   // the harness already saw; one for an item_id that never arrived via
   // output_item.added is an orphan fragment, not a fresh block to
@@ -391,17 +416,27 @@ describe("Responses parser — non-streaming failure states", () => {
     );
   });
 
-  test("throws on status:incomplete", () => {
+  // A truncated body still carries the partial turn the backend managed
+  // to produce; throwing on it would discard usable content, so the output
+  // decodes normally while the (partial, unreliable) usage is withheld.
+  test("decodes partial output and reports no usage on status:incomplete", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
     const incomplete = JSON.stringify({
-      output: [],
+      output: [
+        {
+          type: "message",
+          content: [{ type: "output_text", text: "partial" }],
+        },
+      ],
       status: "incomplete",
       incomplete_details: { reason: "max_output_tokens" },
-      usage: null,
+      usage: { input_tokens: 10, output_tokens: 100 },
     });
-    expect(() => adapter.parseJSONResponse(incomplete)).toThrow(
-      ProtocolMismatchError,
-    );
+    const events = adapter.parseJSONResponse(incomplete);
+    expect(
+      events.filter((e) => e.type === "inference.text.delta"),
+    ).toHaveLength(1);
+    expect(events.some((e) => e.type === "inference.usage")).toBe(false);
   });
 
   test("throws on a response missing the required output field", () => {
