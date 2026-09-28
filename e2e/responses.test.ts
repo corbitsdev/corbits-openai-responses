@@ -239,12 +239,20 @@ describe("openai-responses adapter through runInference", () => {
     expect(error.data.error.message).toContain("backend exploded");
   });
 
-  test("response.incomplete surfaces its reason as a protocol_mismatch inference.error", async () => {
+  // A truncated stream is a terminal turn with the partial content the
+  // backend managed to emit, not a protocol violation: the deltas already
+  // delivered stay, the turn ends, and the billed usage is reported.
+  test("response.incomplete ends the turn with its partial text and usage", async () => {
     harness = setupHarness({ adapters: registry });
     const stream = harness.scenario.createStream();
     harness.scenario.whenRequestMatches(() => true, stream);
     stream.enqueueAll(
       [
+        sse({
+          type: "response.output_text.delta",
+          item_id: "msg_1",
+          delta: "partial",
+        }),
         sse({
           type: "response.incomplete",
           response: {
@@ -257,10 +265,11 @@ describe("openai-responses adapter through runInference", () => {
       { startAt: 1 },
     );
     const events = await collect(harness, [userTurn("hi")]);
-    expect(events.some((e) => e.type === "inference.done")).toBe(false);
-    const error = errorEvent(events);
-    expect(error.data.error.category).toBe("protocol_mismatch");
-    expect(error.data.error.message).toContain("max_output_tokens");
+    expect(events.some((e) => e.type === "inference.error")).toBe(false);
+    const done = doneEvent(events);
+    const texts = done.data.turn.content.filter((b) => b.type === "text");
+    expect(texts.map((b) => b.text)).toEqual(["partial"]);
+    expect(done.data.usage).toMatchObject({ input: 10, output: 100 });
   });
 
   test("a prior signed reasoning turn replays as a reasoning item ahead of its function_call", async () => {

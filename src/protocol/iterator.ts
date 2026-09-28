@@ -71,7 +71,10 @@ const FailedEvent = type({
   "response?": { "error?": { "message?": "string" } },
 });
 const IncompleteEvent = type({
-  response: { "incomplete_details?": { "reason?": "string" } },
+  response: {
+    "incomplete_details?": { "reason?": "string" },
+    "usage?": ResponsesUsage,
+  },
 });
 const ErrorEvent = type({ "message?": "string" });
 
@@ -462,9 +465,11 @@ export function parseResponse(
       const message = validated.response?.error?.message ?? "response failed";
       throw new ProtocolMismatchError(`${provider}: ${message}`, parsed);
     }
-    // Throws like parseJSONResponse does for status "incomplete". The
-    // harness drops the events of a batch that throws, so this event's usage
-    // cannot also be reported.
+    // A truncated turn is still a turn: the backend stopped (often on
+    // max_output_tokens) after emitting usable deltas, and those deltas were
+    // already delivered as events by earlier envelopes. Terminal handling
+    // lives in isResponsesStreamTerminal; the usage is what the backend
+    // bills for the partial turn, so it is reported like a completed one.
     case "response.incomplete": {
       const validated = IncompleteEvent(parsed);
       if (validated instanceof type.errors) {
@@ -474,11 +479,14 @@ export function parseResponse(
           parsed,
         );
       }
-      throw protocolMismatch(
-        provider,
-        `response status is "incomplete": ${validated.response.incomplete_details?.reason ?? "no reason given"}`,
-        parsed,
-      );
+      if (validated.response.usage !== undefined) {
+        events.push({
+          type: "inference.usage",
+          seq,
+          data: { usage: toInferenceUsage(validated.response.usage), source },
+        });
+      }
+      return events;
     }
     case "error": {
       const validated = ErrorEvent(parsed);
@@ -614,12 +622,9 @@ export function parseJSONResponse(
       parsed,
     );
   }
-  if (response.status === "incomplete") {
-    throw new ProtocolMismatchError(
-      `${provider} parseJSONResponse: response status is "incomplete": ${response.incomplete_details?.reason ?? "no reason given"}`,
-      parsed,
-    );
-  }
+  // A truncated body still carries the partial turn the backend managed
+  // to produce; throwing on it would discard usable content, so status
+  // "incomplete" decodes like a completed one.
 
   const seq = 0;
   const events: InferenceEvent[] = [];
