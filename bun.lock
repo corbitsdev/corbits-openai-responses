@@ -8,17 +8,17 @@
         "arktype": "2.2.3",
       },
       "devDependencies": {
-        "@intx/inference": "0.4.0",
-        "@intx/inference-testing": "0.4.0",
-        "@intx/types": "0.4.0",
+        "@intx/inference": "0.5.0",
+        "@intx/inference-testing": "0.5.0",
+        "@intx/types": "0.5.0",
         "@types/bun": "1.3.14",
         "oxfmt": "0.70.0",
         "oxlint": "1.85.0",
         "typescript": "6.0.3",
       },
       "peerDependencies": {
-        "@intx/inference": "^0.4.0",
-        "@intx/types": "^0.4.0",
+        "@intx/inference": "^0.5.0",
+        "@intx/types": "^0.5.0",
       },
     },
   },
@@ -27,15 +27,15 @@
 
     "@ark/util": ["@ark/util@0.56.2", "", {}, "sha512-9kU2sUE38FZEGG7l3hamYMBieLYEJh2L1mrYD2eXpT+78EnQSV1bhjxJhnxGBMSTbtwpBSDNSK+K60WvaI/DTQ=="],
 
-    "@intx/inference": ["@intx/inference@0.4.0", "", { "dependencies": { "@intx/log": "0.4.0", "@intx/types": "0.4.0", "arktype": "^2.1.29" } }, "sha512-cuaqCqotmjg0OzGUm8QmFJr1xX5wPVS0LeuhrxHsj0X3ImoCzVB4e/ttTc+DaP3K1tTMQ/8Q8HHCAPX36mOecQ=="],
+    "@intx/inference": ["@intx/inference@0.5.0", "", { "dependencies": { "@intx/log": "0.5.0", "@intx/types": "0.5.0", "arktype": "^2.1.29" } }, "sha512-Dr4HwV1RH+tlPjH5DqL5buymt3NdbX/v7gG1zEwSqUvQ044V8NBPJA7u7+o+w3zMrRwyUiW+n4d+lUooCVv3JA=="],
 
-    "@intx/inference-discovery": ["@intx/inference-discovery@0.4.0", "", { "dependencies": { "@intx/types": "0.4.0", "arktype": "^2.1.29" } }, "sha512-XZQYZZ9JHcTVNVMZBffOqCzHtmRwvZZxLKvwNg1vN9d4EPfXaCF9rnbDgdaUCWXPfa/T+y2aZs0m0X3a/4xPAQ=="],
+    "@intx/inference-discovery": ["@intx/inference-discovery@0.5.0", "", { "dependencies": { "@intx/types": "0.5.0", "arktype": "^2.1.29" } }, "sha512-kD1x3wdamwop2thLw92MDbLtTt4zp1qHWCoVeXqZ3NR29XF1n7JA8gfpwAjWhIpObMJbF26BPZ7WAGObWrDqow=="],
 
-    "@intx/inference-testing": ["@intx/inference-testing@0.4.0", "", { "dependencies": { "@intx/inference": "0.4.0", "@intx/inference-discovery": "0.4.0", "@intx/types": "0.4.0", "arktype": "^2.1.29" } }, "sha512-nyKbyv+ZPFCJ+Fl3Nczkr/gp/kwa6zVcwFmve7kM0JTpNFfMWspZXUz7QnQbrIpSuvx1i1QDUNRiokGvYS9jQA=="],
+    "@intx/inference-testing": ["@intx/inference-testing@0.5.0", "", { "dependencies": { "@intx/inference": "0.5.0", "@intx/inference-discovery": "0.5.0", "@intx/types": "0.5.0", "arktype": "^2.1.29" } }, "sha512-jRWiEiXSMF383JbmcAGDivZ9MQXs/4ClVgjzVNFFpt/1eaHUB874UncGLRVksM0stVqzkSn/sBV7dulC3U7EQA=="],
 
-    "@intx/log": ["@intx/log@0.4.0", "", { "dependencies": { "@logtape/hono": "^2.0.2", "@logtape/logtape": "^2.0.2" }, "peerDependencies": { "hono": "^4.0.0" }, "optionalPeers": ["hono"] }, "sha512-f1IPZ/9YpEqlA0I2UZPOlRJOTDoOFEZRwZoUVuw8DpgR1WatOMm4hA0E8o6Mtz+pA0ux7gVdls4y/JZcgypsfQ=="],
+    "@intx/log": ["@intx/log@0.5.0", "", { "dependencies": { "@logtape/hono": "^2.0.2", "@logtape/logtape": "^2.0.2" }, "peerDependencies": { "hono": "^4.0.0" }, "optionalPeers": ["hono"] }, "sha512-SxS1WM/wsxzWgAUBDE8RcBpoZSxNnVoRm21YnHr+uZeGzS1bkqc7zW41PzVAW9p6+EsoSZFN6dr5R3jcs4k9RA=="],
 
-    "@intx/types": ["@intx/types@0.4.0", "", { "dependencies": { "arktype": "^2.1.29", "semver": "^7.7.2" } }, "sha512-nJ2fcmskMOZNMRfbHs5ueKpCANHNttoL+sZgIoFaVUF/QLpFWfVp0YV72CQAaa9bVv9j5kRSwtSOCCGSlwQ6Dw=="],
+    "@intx/types": ["@intx/types@0.5.0", "", { "dependencies": { "arktype": "^2.1.29", "semver": "^7.7.2" } }, "sha512-FZu96zH9XqEgpOahXbXUPkg8qAV0TG4JggrE5A4ZN0jdiEB6n06YM6CPv+REuoKoYF9UIHviwltV9ZbT2D1rdQ=="],
 
     "@logtape/hono": ["@logtape/hono@2.3.2", "", { "peerDependencies": { "@logtape/logtape": "^2.3.2", "hono": "^4.0.0" } }, "sha512-fwjfktpQSucHQCO6OYCHUrcgwHPhU41VKTJt2gtqSoW3MjYMUtdZJTGJx2JTAj+8zyQ1cXqugkEKVG07wwSU4g=="],
 

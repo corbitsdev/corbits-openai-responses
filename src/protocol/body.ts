@@ -4,7 +4,7 @@ import {
   type BuiltRequest,
   type ToolNameLimit,
 } from "@intx/inference";
-import { formatSafetyRatingText } from "@intx/types/runtime";
+import { formatSafetyRatingText } from "@intx/types/format-safety-rating";
 import type {
   ContentBlock,
   ConversationTurn,
