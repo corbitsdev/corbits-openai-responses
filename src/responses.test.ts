@@ -4,6 +4,7 @@ import type {
   ConversationTurn,
   InferenceEvent,
   LastCycleSource,
+  InferenceOptions,
 } from "@intx/types/runtime";
 import {
   createOpenAIResponsesAdapter,
@@ -445,6 +446,48 @@ describe("Responses parser — non-streaming failure states", () => {
     expect(() =>
       adapter.parseJSONResponse(JSON.stringify({ usage: {} })),
     ).toThrow(ProtocolMismatchError);
+  });
+});
+
+describe("Responses request builder — neutral effort", () => {
+  const reasoningOf = (quirks: ResponsesQuirks, options: InferenceOptions) =>
+    bodyOf(
+      createOpenAIResponsesAdapter(source, quirks).buildRequest(
+        turns,
+        "model",
+        options,
+      ),
+    )["reasoning"];
+
+  test("is sent as reasoning.effort with no reasoning quirk", () => {
+    expect(reasoningOf({}, { effort: "high" })).toEqual({ effort: "high" });
+  });
+
+  test("max is the source's maxEffort, else high", () => {
+    expect(
+      reasoningOf({ reasoning: { maxEffort: "xhigh" } }, { effort: "max" }),
+    ).toEqual({ effort: "xhigh" });
+    expect(reasoningOf({}, { effort: "max" })).toEqual({ effort: "high" });
+  });
+
+  test("the effortOption provider option wins over the neutral effort", () => {
+    expect(
+      reasoningOf(
+        { reasoning: { summary: "detailed", effortOption: "effort" } },
+        { effort: "low", providerOptions: { effort: "high" } },
+      ),
+    ).toEqual({ summary: "detailed", effort: "high" });
+  });
+
+  test("includeReasoningEffort still filters a mapped effort", () => {
+    const adapter = responsesAdapterFactory(
+      {},
+      { includeReasoningEffort: (effort) => effort !== "low" },
+    )(source);
+    const body = bodyOf(
+      adapter.buildRequest(turns, "model", { effort: "low" }),
+    );
+    expect(body).not.toHaveProperty("reasoning");
   });
 });
 

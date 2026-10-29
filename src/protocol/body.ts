@@ -8,6 +8,7 @@ import { formatSafetyRatingText } from "@intx/types/format-safety-rating";
 import type {
   ContentBlock,
   ConversationTurn,
+  InferenceEffort,
   InferenceOptions,
 } from "@intx/types/runtime";
 
@@ -275,25 +276,37 @@ function systemPromptItem(
   return { type: "message", role: placement.role, content };
 }
 
+// Interchange's neutral effort: low, medium and high pass as given, and max
+// is the source's `maxEffort`, else high. Interchange's own OpenAI adapter
+// maps it the same way but warns on that fallback; this package has no logger.
+function wireEffort(
+  effort: InferenceEffort | undefined,
+  maxEffort: "xhigh" | "max" | undefined,
+): string | undefined {
+  if (effort !== "max") return effort;
+  return maxEffort ?? "high";
+}
+
 function reasoningField(
   quirks: ResolvedResponsesQuirks,
   options: InferenceOptions,
   hooks: ResponsesHooks | undefined,
 ): Record<string, unknown> | undefined {
   const reasoning = quirks.reasoning;
-  if (reasoning === undefined) return undefined;
   const field: Record<string, unknown> = {};
-  if (reasoning.summary !== undefined) field["summary"] = reasoning.summary;
-  const effortOption = reasoning.effortOption;
-  if (effortOption !== undefined) {
-    const effort = optionString(options, effortOption);
-    if (
-      effort !== undefined &&
-      (hooks?.includeReasoningEffort === undefined ||
-        hooks.includeReasoningEffort(effort))
-    ) {
-      field["effort"] = effort;
-    }
+  if (reasoning?.summary !== undefined) field["summary"] = reasoning.summary;
+  const effortOption = reasoning?.effortOption;
+  const fromOption =
+    effortOption === undefined
+      ? undefined
+      : optionString(options, effortOption);
+  const effort = fromOption ?? wireEffort(options.effort, reasoning?.maxEffort);
+  if (
+    effort !== undefined &&
+    (hooks?.includeReasoningEffort === undefined ||
+      hooks.includeReasoningEffort(effort))
+  ) {
+    field["effort"] = effort;
   }
   return Object.keys(field).length > 0 ? field : undefined;
 }
