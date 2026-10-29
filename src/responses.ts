@@ -52,6 +52,9 @@ type SystemPromptPlacement = typeof SystemPromptPlacement.infer;
 const ReasoningQuirks = type({
   "summary?": "'auto' | 'detailed'",
   "effortOption?": "string",
+  // The wire value Interchange's neutral `max` effort becomes. The highest
+  // level differs per model, so only the source can name it.
+  "maxEffort?": "'xhigh' | 'max'",
 });
 type ReasoningQuirks = typeof ReasoningQuirks.infer;
 
