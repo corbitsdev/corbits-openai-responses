@@ -36,6 +36,10 @@ const FunctionCallArgsDeltaEvent = type({
   item_id: "string > 0",
   delta: "string",
 });
+const FunctionCallArgsDoneEvent = type({
+  item_id: "string > 0",
+  arguments: "string",
+});
 
 const OutputItemAddedEvent = type({
   item: {
@@ -43,6 +47,7 @@ const OutputItemAddedEvent = type({
     "id?": "string > 0",
     "call_id?": "string > 0",
     "name?": "string > 0",
+    "arguments?": "string",
   },
 });
 
@@ -51,6 +56,7 @@ const OutputItemDoneEvent = type({
     type: "string",
     "id?": "string > 0",
     "encrypted_content?": "string",
+    "arguments?": "string",
   },
 });
 
@@ -133,10 +139,18 @@ function toInferenceUsage(
 // encrypted-reasoning signature to the exact thinking block it belongs to.
 // `kind` is recorded so a signature is only emitted against a real thinking
 // block.
-type BlockKind = "text" | "thinking" | "tool_call" | "refusal";
+type BlockEntry =
+  | { index: number; kind: "text" | "thinking" | "refusal" }
+  | {
+      index: number;
+      kind: "tool_call";
+      callId: string;
+      hasEmittedArgs: boolean;
+    };
+type ToolCallBlockEntry = Extract<BlockEntry, { kind: "tool_call" }>;
 type ResponsesBlockIndexer = {
   nextIndex: number;
-  items: Map<string, { index: number; kind: BlockKind }>;
+  items: Map<string, BlockEntry>;
 };
 
 export function createResponsesBlockIndexer(): ResponsesBlockIndexer {
@@ -146,7 +160,7 @@ export function createResponsesBlockIndexer(): ResponsesBlockIndexer {
 function getOrAssignBlockIndex(
   state: ResponsesBlockIndexer,
   itemId: string,
-  kind: BlockKind,
+  kind: "text" | "thinking" | "refusal",
 ): number {
   const existing = state.items.get(itemId);
   if (existing !== undefined) return existing.index;
@@ -154,6 +168,41 @@ function getOrAssignBlockIndex(
   state.nextIndex += 1;
   state.items.set(itemId, { index, kind });
   return index;
+}
+
+function registerToolCallBlock(
+  state: ResponsesBlockIndexer,
+  itemId: string,
+  callId: string,
+): ToolCallBlockEntry {
+  const existing = state.items.get(itemId);
+  if (existing?.kind === "tool_call") return existing;
+  const entry: ToolCallBlockEntry = {
+    index: state.nextIndex,
+    kind: "tool_call",
+    callId,
+    hasEmittedArgs: false,
+  };
+  state.nextIndex += 1;
+  state.items.set(itemId, entry);
+  return entry;
+}
+
+function toolCallDeltaEvent(
+  entry: ToolCallBlockEntry,
+  argumentFragment: string,
+): InferenceEvent {
+  entry.hasEmittedArgs = true;
+  return {
+    type: "inference.tool_call.delta",
+    seq: 0,
+    data: {
+      callId: entry.callId,
+      argumentFragment,
+      partial: EMPTY_PARTIAL,
+      index: entry.index,
+    },
+  };
 }
 
 function protocolMismatch(
@@ -305,6 +354,7 @@ export function parseResponse(
             parsed,
           );
         }
+        const entry = registerToolCallBlock(indexer, item.id, item.call_id);
         events.push({
           type: "inference.tool_call.start",
           seq,
@@ -312,9 +362,12 @@ export function parseResponse(
             callId: item.call_id,
             name: decodeToolName(item.name),
             partial: EMPTY_PARTIAL,
-            index: getOrAssignBlockIndex(indexer, item.id, "tool_call"),
+            index: entry.index,
           },
         });
+        if (item.arguments !== undefined && item.arguments.length > 0) {
+          events.push(toolCallDeltaEvent(entry, item.arguments));
+        }
       } else if (item.type === "reasoning") {
         // A reasoning item with no id cannot be pre-registered, and the
         // signature it will later carry on output_item.done could never be
@@ -392,6 +445,29 @@ export function parseResponse(
             },
           });
         }
+      } else if (item.type === "function_call") {
+        if (item.id === undefined) {
+          throw protocolMismatch(
+            provider,
+            "output_item.done function_call item is missing id",
+            parsed,
+          );
+        }
+        const existing = indexer.items.get(item.id);
+        if (existing?.kind !== "tool_call") {
+          throw protocolMismatch(
+            provider,
+            `output_item.done function_call for item_id ${item.id} was never announced by output_item.added`,
+            parsed,
+          );
+        }
+        if (
+          !existing.hasEmittedArgs &&
+          item.arguments !== undefined &&
+          item.arguments.length > 0
+        ) {
+          events.push(toolCallDeltaEvent(existing, item.arguments));
+        }
       }
       return events;
     }
@@ -410,7 +486,7 @@ export function parseResponse(
       // tool_call.start to route it against, not a fresh block to
       // synthesize silently.
       const existing = indexer.items.get(validated.item_id);
-      if (existing === undefined) {
+      if (existing?.kind !== "tool_call") {
         throw protocolMismatch(
           provider,
           `function_call_arguments.delta for item_id ${validated.item_id} was never announced by output_item.added`,
@@ -418,20 +494,29 @@ export function parseResponse(
         );
       }
       if (validated.delta.length > 0) {
-        const blockIndex = existing.index;
-        events.push({
-          type: "inference.tool_call.delta",
-          seq,
-          // The harness routes argument fragments by a per-stream
-          // placeholder keyed to the block index registered on the start
-          // event.
-          data: {
-            callId: String(blockIndex),
-            argumentFragment: validated.delta,
-            partial: EMPTY_PARTIAL,
-            index: blockIndex,
-          },
-        });
+        events.push(toolCallDeltaEvent(existing, validated.delta));
+      }
+      return events;
+    }
+    case "response.function_call_arguments.done": {
+      const validated = FunctionCallArgsDoneEvent(parsed);
+      if (validated instanceof type.errors) {
+        throw protocolMismatch(
+          provider,
+          `function_call_arguments.done failed schema validation: ${validated.summary}`,
+          parsed,
+        );
+      }
+      const existing = indexer.items.get(validated.item_id);
+      if (existing?.kind !== "tool_call") {
+        throw protocolMismatch(
+          provider,
+          `function_call_arguments.done for item_id ${validated.item_id} was never announced by output_item.added`,
+          parsed,
+        );
+      }
+      if (!existing.hasEmittedArgs && validated.arguments.length > 0) {
+        events.push(toolCallDeltaEvent(existing, validated.arguments));
       }
       return events;
     }
@@ -738,7 +823,7 @@ export function parseJSONResponse(
           type: "inference.tool_call.delta",
           seq,
           data: {
-            callId: String(index),
+            callId: item.call_id,
             argumentFragment: item.arguments,
             partial: EMPTY_PARTIAL,
             index,

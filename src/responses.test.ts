@@ -400,6 +400,177 @@ describe("Responses parser — event schema validation", () => {
       ProtocolMismatchError,
     );
   });
+
+  test("function_call_arguments.done or output_item.done for an unannounced function_call throws", () => {
+    const adapter = createOpenAIResponsesAdapter(source, {});
+    adapter.buildRequest(turns, "model", {});
+    expect(() =>
+      adapter.parseResponse(
+        JSON.stringify({
+          type: "response.function_call_arguments.done",
+          item_id: "never_announced",
+          arguments: '{"cmd":"ls"}',
+        }),
+      ),
+    ).toThrow(ProtocolMismatchError);
+    expect(() =>
+      adapter.parseResponse(
+        JSON.stringify({
+          type: "response.output_item.done",
+          item: {
+            type: "function_call",
+            id: "never_announced",
+            arguments: '{"cmd":"ls"}',
+          },
+        }),
+      ),
+    ).toThrow(ProtocolMismatchError);
+  });
+});
+
+describe("Responses parser — parallel function_call arguments", () => {
+  type ToolCallDelta = Extract<
+    InferenceEvent,
+    { type: "inference.tool_call.delta" }
+  >;
+
+  // Parallel tool calls can deliver arguments on output_item.added,
+  // function_call_arguments.delta, function_call_arguments.done, or
+  // output_item.done; each path must emit the real callId with its block
+  // index and never duplicate arguments when later done envelopes repeat them.
+  test("routes parallel function_call arguments across added, delta, arguments.done, and output_item.done without duplication", () => {
+    const adapter = createOpenAIResponsesAdapter(source, {});
+    adapter.buildRequest(turns, "model", {});
+
+    const frames = [
+      {
+        type: "response.output_item.added",
+        item: {
+          type: "function_call",
+          id: "fc_added",
+          call_id: "call_added",
+          name: "read_file",
+          arguments: '{"path":"a.ts"}',
+        },
+      },
+      {
+        type: "response.output_item.added",
+        item: {
+          type: "function_call",
+          id: "fc_delta",
+          call_id: "call_delta",
+          name: "read_file",
+          arguments: "",
+        },
+      },
+      {
+        type: "response.output_item.added",
+        item: {
+          type: "function_call",
+          id: "fc_args_done",
+          call_id: "call_args_done",
+          name: "read_file",
+        },
+      },
+      {
+        type: "response.output_item.added",
+        item: {
+          type: "function_call",
+          id: "fc_item_done",
+          call_id: "call_item_done",
+          name: "read_file",
+        },
+      },
+      {
+        type: "response.function_call_arguments.delta",
+        item_id: "fc_delta",
+        delta: '{"path":"b.ts"}',
+      },
+      {
+        type: "response.function_call_arguments.done",
+        item_id: "fc_added",
+        arguments: '{"path":"a.ts"}',
+      },
+      {
+        type: "response.function_call_arguments.done",
+        item_id: "fc_delta",
+        arguments: '{"path":"b.ts"}',
+      },
+      {
+        type: "response.function_call_arguments.done",
+        item_id: "fc_args_done",
+        arguments: '{"path":"c.ts"}',
+      },
+      {
+        type: "response.output_item.done",
+        item: {
+          type: "function_call",
+          id: "fc_added",
+          call_id: "call_added",
+          name: "read_file",
+          arguments: '{"path":"a.ts"}',
+        },
+      },
+      {
+        type: "response.output_item.done",
+        item: {
+          type: "function_call",
+          id: "fc_delta",
+          call_id: "call_delta",
+          name: "read_file",
+          arguments: '{"path":"b.ts"}',
+        },
+      },
+      {
+        type: "response.output_item.done",
+        item: {
+          type: "function_call",
+          id: "fc_args_done",
+          call_id: "call_args_done",
+          name: "read_file",
+          arguments: '{"path":"c.ts"}',
+        },
+      },
+      {
+        type: "response.output_item.done",
+        item: {
+          type: "function_call",
+          id: "fc_item_done",
+          call_id: "call_item_done",
+          name: "read_file",
+          arguments: '{"path":"d.ts"}',
+        },
+      },
+    ];
+
+    const emitted = frames.flatMap((frame) =>
+      adapter.parseResponse(JSON.stringify(frame)),
+    );
+    const deltas = emitted.filter(
+      (e): e is ToolCallDelta => e.type === "inference.tool_call.delta",
+    );
+
+    expect(
+      deltas.map((d) => ({
+        callId: d.data.callId,
+        argumentFragment: d.data.argumentFragment,
+        index: d.data.index,
+      })),
+    ).toEqual([
+      { callId: "call_added", argumentFragment: '{"path":"a.ts"}', index: 0 },
+      { callId: "call_delta", argumentFragment: '{"path":"b.ts"}', index: 1 },
+      {
+        callId: "call_args_done",
+        argumentFragment: '{"path":"c.ts"}',
+        index: 2,
+      },
+      {
+        callId: "call_item_done",
+        argumentFragment: '{"path":"d.ts"}',
+        index: 3,
+      },
+    ]);
+  });
 });
 
 describe("Responses parser — non-streaming failure states", () => {
