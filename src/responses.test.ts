@@ -101,6 +101,23 @@ describe("Responses adapter — block-index lifecycle", () => {
       }),
     ).toThrow();
   });
+
+  test.each([
+    ["headers", { headers: { statc: {} } }],
+    [
+      "headers.fromOption",
+      {
+        headers: { fromOption: [{ optionKey: "a", header: "x-a", hedr: "" }] },
+      },
+    ],
+    [
+      "systemPrompt",
+      { systemPrompt: { role: "system", shape: "string", rol: "system" } },
+    ],
+    ["reasoning", { reasoning: { sumary: "auto" } }],
+  ])("rejects an unrecognized %s field instead of ignoring it", (_, quirks) => {
+    expect(() => createOpenAIResponsesAdapter(source, quirks)).toThrow();
+  });
 });
 
 describe("Responses request builder — quirk matrix", () => {

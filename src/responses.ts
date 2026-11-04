@@ -31,6 +31,7 @@ import {
 const HeaderFromOption = type({
   optionKey: "string",
   header: "string",
+  "+": "reject",
 });
 type HeaderFromOption = typeof HeaderFromOption.infer;
 
@@ -38,6 +39,7 @@ const ResponsesHeaders = type({
   "static?": { "[string]": "string" },
   "modelHeader?": "string",
   "fromOption?": HeaderFromOption.array(),
+  "+": "reject",
 });
 
 // `shape: "string"` sends plain string content (Grok/OpenAI); `"parts"`
@@ -46,6 +48,7 @@ const ResponsesHeaders = type({
 const SystemPromptPlacement = type({
   role: "'system' | 'developer'",
   shape: "'string' | 'parts'",
+  "+": "reject",
 });
 type SystemPromptPlacement = typeof SystemPromptPlacement.infer;
 
@@ -55,6 +58,7 @@ const ReasoningQuirks = type({
   // The wire value Interchange's neutral `max` effort becomes. The highest
   // level differs per model, so only the source can name it.
   "maxEffort?": "'xhigh' | 'max'",
+  "+": "reject",
 });
 type ReasoningQuirks = typeof ReasoningQuirks.infer;
 
