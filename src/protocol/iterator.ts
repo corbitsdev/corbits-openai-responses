@@ -138,7 +138,10 @@ function toInferenceUsage(
 // tool calls interleave, and lets `response.output_item.done` attach an
 // encrypted-reasoning signature to the exact thinking block it belongs to.
 // `kind` is recorded so a signature is only emitted against a real thinking
-// block.
+// block. A tool call's arguments may arrive only on `output_item.added`,
+// `function_call_arguments.done`, or `output_item.done` (parallel calls on
+// some backends skip deltas entirely); `hasEmittedArgs` lets those envelopes
+// fill in arguments once without repeating what deltas already streamed.
 type BlockEntry =
   | { index: number; kind: "text" | "thinking" | "refusal" }
   | {
@@ -446,6 +449,9 @@ export function parseResponse(
           });
         }
       } else if (item.type === "function_call") {
+        // Without an announced block the arguments have no tool_call.start
+        // to attach to; dropping them would finalize the turn without the
+        // call.
         if (item.id === undefined) {
           throw protocolMismatch(
             provider,
