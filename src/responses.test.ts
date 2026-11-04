@@ -274,7 +274,7 @@ describe("Responses request builder — quirk matrix", () => {
   });
 });
 
-describe("Responses request builder — document input", () => {
+describe("Responses request builder — media input", () => {
   const contentOf = (
     block: ContentBlock,
     quirks: Record<string, unknown> = {},
@@ -329,6 +329,60 @@ describe("Responses request builder — document input", () => {
     expect(() => contentOf(block)).toThrow(
       "received mimeType: application/zip",
     );
+  });
+
+  test("a base64 PDF goes to input_file with file_data", () => {
+    const block: ContentBlock = {
+      type: "document",
+      source: { kind: "base64", mimeType: "application/pdf", data: "JVBERi0=" },
+    };
+    expect(contentOf(block)).toEqual([
+      {
+        type: "input_file",
+        filename: "document.pdf",
+        file_data: "data:application/pdf;base64,JVBERi0=",
+      },
+    ]);
+  });
+
+  test.each<{ name: string; block: ContentBlock; expected: unknown }>([
+    {
+      name: "base64",
+      block: {
+        type: "image",
+        source: { kind: "base64", mimeType: "image/png", data: "iVBORw==" },
+      },
+      expected: {
+        type: "input_image",
+        image_url: "data:image/png;base64,iVBORw==",
+      },
+    },
+    {
+      name: "url",
+      block: {
+        type: "image",
+        source: {
+          kind: "url",
+          mimeType: "image/png",
+          url: "https://example.com/a.png",
+        },
+      },
+      expected: { type: "input_image", image_url: "https://example.com/a.png" },
+    },
+    {
+      name: "file-reference",
+      block: {
+        type: "image",
+        source: {
+          kind: "file-reference",
+          mimeType: "image/png",
+          reference: "file-abc",
+        },
+      },
+      expected: { type: "input_image", file_id: "file-abc" },
+    },
+  ])("a $name image goes to input_image", ({ block, expected }) => {
+    expect(contentOf(block)).toEqual([expected]);
   });
 });
 
