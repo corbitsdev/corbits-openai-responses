@@ -114,6 +114,10 @@ Every field is optional. An absent field keeps the protocol default. Unknown key
 
 Interchange's neutral `effort` (`low | medium | high | max`) is sent as `reasoning.effort`, even when the source has no `reasoning` quirk: `low`, `medium` and `high` as given, `max` as `reasoning.maxEffort` or `high` when that is unset. A non-empty `providerOptions[reasoning.effortOption]` wins over it. `includeReasoningEffort` filters either.
 
+### Incomplete responses
+
+An incomplete response (`response.incomplete`, or a JSON body with `status: "incomplete"`) keeps its partial output and usage. When `incomplete_details.reason` is `content_filter`, an `inference.safety_rating` event with `blockReason: "content_filter"` comes before the usage.
+
 ## Using with Interchange
 
 Interchange loads custom adapters from an operator-configured `AdapterManifest`. Add one entry per provider id you serve:

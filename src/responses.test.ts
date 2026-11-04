@@ -412,6 +412,29 @@ describe("Responses parser — event schema validation", () => {
     expect(events.map((e) => e.type)).toEqual(["inference.usage"]);
   });
 
+  test("response.incomplete on content_filter reports a safety rating before usage", () => {
+    const adapter = createOpenAIResponsesAdapter(source, {});
+    adapter.buildRequest(turns, "model", {});
+    const incomplete = JSON.stringify({
+      type: "response.incomplete",
+      response: {
+        status: "incomplete",
+        incomplete_details: { reason: "content_filter" },
+        usage: { input_tokens: 10, output_tokens: 3 },
+      },
+    });
+    const events = adapter.parseResponse(incomplete);
+    expect(events.map((e) => e.type)).toEqual([
+      "inference.safety_rating",
+      "inference.usage",
+    ]);
+    expect(events[0]).toMatchObject({
+      data: {
+        safetyRating: { type: "safety_rating", blockReason: "content_filter" },
+      },
+    });
+  });
+
   // A function_call_arguments.delta is only routable to the tool_call.start
   // the harness already saw; one for an item_id that never arrived via
   // output_item.added is an orphan fragment, not a fresh block to
@@ -635,6 +658,27 @@ describe("Responses parser — non-streaming failure states", () => {
       events.filter((e) => e.type === "inference.text.delta"),
     ).toHaveLength(1);
     expect(events.some((e) => e.type === "inference.usage")).toBe(true);
+  });
+
+  test("reports a safety rating before usage on status:incomplete content_filter", () => {
+    const adapter = createOpenAIResponsesAdapter(source, {});
+    const incomplete = JSON.stringify({
+      output: [],
+      status: "incomplete",
+      error: null,
+      incomplete_details: { reason: "content_filter" },
+      usage: { input_tokens: 10, output_tokens: 0 },
+    });
+    const events = adapter.parseJSONResponse(incomplete);
+    expect(events.map((e) => e.type)).toEqual([
+      "inference.safety_rating",
+      "inference.usage",
+    ]);
+    expect(events[0]).toMatchObject({
+      data: {
+        safetyRating: { type: "safety_rating", blockReason: "content_filter" },
+      },
+    });
   });
 
   // OpenAI sends both fields as null on every completed body.
