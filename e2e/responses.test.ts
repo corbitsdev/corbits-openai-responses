@@ -374,4 +374,82 @@ describe("openai-responses adapter through runInference", () => {
       { type: "text", text: "still here" },
     ]);
   });
+
+  test("parallel function_call items assemble arguments from done envelopes when deltas are absent", async () => {
+    harness = setupHarness({ adapters: registry });
+    harness.scenario.onTool("read_file", () => ({ ok: true }));
+    const stream = harness.scenario.createStream();
+    harness.scenario.whenRequestMatches(() => true, stream);
+    stream.enqueueAll(
+      [
+        sse({
+          type: "response.output_item.added",
+          output_index: 0,
+          item: {
+            type: "function_call",
+            id: "fc_1",
+            call_id: "call_1",
+            name: "read_file",
+          },
+        }),
+        sse({
+          type: "response.output_item.added",
+          output_index: 1,
+          item: {
+            type: "function_call",
+            id: "fc_2",
+            call_id: "call_2",
+            name: "read_file",
+          },
+        }),
+        sse({
+          type: "response.function_call_arguments.done",
+          item_id: "fc_1",
+          arguments: '{"path":"first.ts"}',
+        }),
+        sse({
+          type: "response.output_item.done",
+          output_index: 0,
+          item: {
+            type: "function_call",
+            id: "fc_1",
+            call_id: "call_1",
+            name: "read_file",
+            arguments: '{"path":"first.ts"}',
+          },
+        }),
+        sse({
+          type: "response.output_item.done",
+          output_index: 1,
+          item: {
+            type: "function_call",
+            id: "fc_2",
+            call_id: "call_2",
+            name: "read_file",
+            arguments: '{"path":"second.ts"}',
+          },
+        }),
+        sse({
+          type: "response.completed",
+          response: { usage: { input_tokens: 10, output_tokens: 10 } },
+        }),
+      ],
+      { startAt: 1 },
+    );
+    const events = await collect(harness, [userTurn("read both")]);
+    expect(doneEvent(events).data.turn.content).toEqual([
+      {
+        type: "tool_call",
+        id: "call_1",
+        name: "read_file",
+        arguments: { path: "first.ts" },
+      },
+      {
+        type: "tool_call",
+        id: "call_2",
+        name: "read_file",
+        arguments: { path: "second.ts" },
+      },
+    ]);
+  });
 });
