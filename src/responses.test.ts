@@ -384,6 +384,17 @@ describe("Responses parser — event schema validation", () => {
     expect(events.map((e) => e.type)).toEqual(["inference.usage"]);
   });
 
+  test("response.done reports usage like response.completed", () => {
+    const adapter = createOpenAIResponsesAdapter(source, {});
+    adapter.buildRequest(turns, "model", {});
+    const done = JSON.stringify({
+      type: "response.done",
+      response: { usage: { input_tokens: 10, output_tokens: 20 } },
+    });
+    const events = adapter.parseResponse(done);
+    expect(events.map((e) => e.type)).toEqual(["inference.usage"]);
+  });
+
   // A function_call_arguments.delta is only routable to the tool_call.start
   // the harness already saw; one for an item_id that never arrived via
   // output_item.added is an orphan fragment, not a fresh block to

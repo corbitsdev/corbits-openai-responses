@@ -526,12 +526,15 @@ export function parseResponse(
       }
       return events;
     }
-    case "response.completed": {
+    // `response.done` is an alias some backends emit for `response.completed`;
+    // both carry the turn's usage on the terminal envelope.
+    case "response.completed":
+    case "response.done": {
       const validated = CompletedEvent(parsed);
       if (validated instanceof type.errors) {
         throw protocolMismatch(
           provider,
-          `response.completed failed schema validation: ${validated.summary}`,
+          `${eventType} failed schema validation: ${validated.summary}`,
           parsed,
         );
       }
