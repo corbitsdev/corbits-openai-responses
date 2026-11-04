@@ -42,10 +42,8 @@ type ResponsesInputItem =
 // Tool results carry a content array; the Responses API wants a string. Join
 // the text parts; non-text content is not representable here and is dropped
 // with a marker so the model is not misled into thinking it went missing
-// silently. Only the join and the `<error>` wrapping match the Chat
-// Completions adapter's `role: "tool"` encoding (whose schema likewise has
-// no `is_error` field); the Chat adapter drops non-text content with no
-// marker, so the two wires differ there.
+// silently. The wire has no error flag, so a failed result is wrapped in
+// `<error>` as Interchange's Chat Completions adapter does.
 function toolResultText(
   block: Extract<ContentBlock, { type: "tool_result" }>,
 ): string {
