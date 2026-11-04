@@ -705,6 +705,42 @@ describe("Responses request builder — tool-item dedupe", () => {
   });
 });
 
+describe("Responses request builder — tool-result encoding", () => {
+  // The wire has no error flag; without the `<error>` wrapper the model
+  // cannot tell a failed tool from a successful one.
+  test.each([
+    { name: "success", isError: false, output: "a\nb" },
+    { name: "error", isError: true, output: "<error>\na\nb\n</error>" },
+  ])("encodes a $name result like the Chat adapter", ({ isError, output }) => {
+    const adapter = createOpenAIResponsesAdapter(source, {});
+    const request = adapter.buildRequest(
+      [
+        {
+          role: "user",
+          timestamp: 0,
+          content: [
+            {
+              type: "tool_result",
+              callId: "call_1",
+              isError,
+              content: [
+                { type: "text", text: "a" },
+                { type: "text", text: "b" },
+              ],
+            },
+          ],
+        },
+      ],
+      "model",
+      {},
+    );
+    const outputs = inputItemsOf(request).filter(
+      (item) => item["type"] === "function_call_output",
+    );
+    expect(outputs[0]?.["output"]).toBe(output);
+  });
+});
+
 describe("Responses request builder — un-replayable reasoning", () => {
   const history = (model: string, signature: string): ConversationTurn[] => [
     { role: "user", timestamp: 0, content: [{ type: "text", text: "hi" }] },

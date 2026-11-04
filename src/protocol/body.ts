@@ -42,7 +42,8 @@ type ResponsesInputItem =
 // Tool results carry a content array; the Responses API wants a string. Join
 // the text parts; non-text content is not representable here and is dropped
 // with a marker so the model is not misled into thinking it went missing
-// silently.
+// silently. The wire has no error flag, so a failed result is wrapped in
+// `<error>` as Interchange's Chat Completions adapter does.
 function toolResultText(
   block: Extract<ContentBlock, { type: "tool_result" }>,
 ): string {
@@ -51,7 +52,8 @@ function toolResultText(
     if (c.type === "text") parts.push(c.text);
     else parts.push(`[unsupported ${c.type} content omitted]`);
   }
-  return parts.join("");
+  const text = parts.join("\n");
+  return block.isError ? `<error>\n${text}\n</error>` : text;
 }
 
 // Grounded on the OpenAI Responses API document input shape: a base64
