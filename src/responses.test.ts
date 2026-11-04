@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { ProtocolMismatchError } from "@intx/inference";
 import type {
+  ContentBlock,
   ConversationTurn,
   InferenceEvent,
   LastCycleSource,
@@ -270,6 +271,106 @@ describe("Responses request builder — quirk matrix", () => {
     expect(inputItemsOf(request)[0]?.["content"]).toEqual([
       { type: "output_text", text: "hi" },
     ]);
+  });
+});
+
+describe("Responses request builder — media input", () => {
+  const adapter = createOpenAIResponsesAdapter(source, {});
+  const contentOf = (block: ContentBlock): unknown =>
+    inputItemsOf(
+      adapter.buildRequest(
+        [{ role: "user", timestamp: 0, content: [block] }],
+        "model",
+        {},
+      ),
+    )[0]?.["content"];
+
+  test("a base64 PDF goes to input_file with file_data", () => {
+    const block: ContentBlock = {
+      type: "document",
+      source: { kind: "base64", mimeType: "application/pdf", data: "JVBERi0=" },
+    };
+    expect(contentOf(block)).toEqual([
+      {
+        type: "input_file",
+        filename: "document.pdf",
+        file_data: "data:application/pdf;base64,JVBERi0=",
+      },
+    ]);
+  });
+
+  test.each([
+    { mimeType: "text/plain", text: "héllo" },
+    { mimeType: "text/csv", text: "a,b\n1,2" },
+    { mimeType: "text/markdown", text: "# Plan" },
+    { mimeType: "application/json", text: '{"a":1}' },
+  ])("a base64 $mimeType document goes to input_text", ({ mimeType, text }) => {
+    const data = Buffer.from(text, "utf-8").toString("base64");
+    const block: ContentBlock = {
+      type: "document",
+      source: { kind: "base64", mimeType, data },
+    };
+    expect(contentOf(block)).toEqual([{ type: "input_text", text }]);
+  });
+
+  test("a text document that is not valid UTF-8 throws instead of sending garbage", () => {
+    const block: ContentBlock = {
+      type: "document",
+      source: { kind: "base64", mimeType: "text/plain", data: "/w==" },
+    };
+    expect(() => contentOf(block)).toThrow(
+      "text/plain document is not valid base64-encoded UTF-8 text",
+    );
+  });
+
+  test("a base64 document of another binary type still throws", () => {
+    const block: ContentBlock = {
+      type: "document",
+      source: { kind: "base64", mimeType: "application/zip", data: "UEs=" },
+    };
+    expect(() => contentOf(block)).toThrow(
+      "received mimeType: application/zip",
+    );
+  });
+
+  test.each<{ name: string; block: ContentBlock; expected: unknown }>([
+    {
+      name: "base64",
+      block: {
+        type: "image",
+        source: { kind: "base64", mimeType: "image/png", data: "iVBORw==" },
+      },
+      expected: {
+        type: "input_image",
+        image_url: "data:image/png;base64,iVBORw==",
+      },
+    },
+    {
+      name: "url",
+      block: {
+        type: "image",
+        source: {
+          kind: "url",
+          mimeType: "image/png",
+          url: "https://example.com/a.png",
+        },
+      },
+      expected: { type: "input_image", image_url: "https://example.com/a.png" },
+    },
+    {
+      name: "file-reference",
+      block: {
+        type: "image",
+        source: {
+          kind: "file-reference",
+          mimeType: "image/png",
+          reference: "file-abc",
+        },
+      },
+      expected: { type: "input_image", file_id: "file-abc" },
+    },
+  ])("a $name image goes to input_image", ({ block, expected }) => {
+    expect(contentOf(block)).toEqual([expected]);
   });
 });
 

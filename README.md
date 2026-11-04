@@ -1,6 +1,6 @@
 # @corbits/openai-responses
 
-An `@intx/inference` provider adapter for the OpenAI Responses API (`/v1/responses`): SSE and JSON responses, text, tool calls, image and PDF input, and reasoning replay. An inference provider for Corbits and Interchange agents that also works in any host that runs `@intx/inference`.
+An `@intx/inference` provider adapter for the OpenAI Responses API (`/v1/responses`): SSE and JSON responses, text, tool calls, image, PDF and text document input, and reasoning replay. An inference provider for Corbits and Interchange agents that also works in any host that runs `@intx/inference`.
 
 ## Why @corbits/openai-responses?
 
