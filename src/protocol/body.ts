@@ -4,6 +4,8 @@ import {
   type BuiltRequest,
   type ToolNameLimit,
 } from "@intx/inference";
+import { isTextLikeMimeType } from "@intx/types/attachments";
+import { base64Decode } from "@intx/types/base64";
 import { formatSafetyRatingText } from "@intx/types/format-safety-rating";
 import type {
   ContentBlock,
@@ -59,12 +61,23 @@ function toolResultText(
 // Grounded on the OpenAI Responses API document input shape: a base64
 // document synthesizes a deterministic filename from its mimeType, since
 // MediaSource carries no filename field of its own. Only PDF is supported
-// today, matching the Chat Completions adapter's own document support.
+// as a file, matching the Chat Completions adapter's own document support.
 function filenameForDocumentMime(mimeType: string): string {
   if (mimeType === "application/pdf") return "document.pdf";
   throw new Error(
-    `@corbits/openai-responses: document input currently supports application/pdf only; received mimeType: ${mimeType}`,
+    `@corbits/openai-responses: document input supports application/pdf and text types only; received mimeType: ${mimeType}`,
   );
+}
+
+function decodeTextDocument(data: string, mimeType: string): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(base64Decode(data));
+  } catch (cause) {
+    throw new Error(
+      `@corbits/openai-responses: ${mimeType} document is not valid base64-encoded UTF-8 text`,
+      { cause },
+    );
+  }
 }
 
 // Converts one content block to zero or one Responses content part. Blocks
@@ -99,6 +112,13 @@ function toResponsesContentPart(
     case "document": {
       const source = block.source;
       if (source.kind === "base64") {
+        // input_file rejects text types, so their decoded text goes inline.
+        if (isTextLikeMimeType(source.mimeType)) {
+          return {
+            type: textKind,
+            text: decodeTextDocument(source.data, source.mimeType),
+          };
+        }
         return {
           type: "input_file",
           filename: filenameForDocumentMime(source.mimeType),
