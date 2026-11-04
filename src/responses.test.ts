@@ -434,10 +434,7 @@ describe("Responses parser — parallel function_call arguments", () => {
     { type: "inference.tool_call.delta" }
   >;
 
-  // Parallel tool calls can deliver arguments on output_item.added,
-  // function_call_arguments.delta, function_call_arguments.done, or
-  // output_item.done; each path must emit the real callId with its block
-  // index and never duplicate arguments when later done envelopes repeat them.
+  // Each path must carry the real callId, not the block-index placeholder.
   test("routes parallel function_call arguments across added, delta, arguments.done, and output_item.done without duplication", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
     adapter.buildRequest(turns, "model", {});
