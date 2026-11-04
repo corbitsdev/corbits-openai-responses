@@ -82,6 +82,21 @@ const IncompleteEvent = type({
     "usage?": ResponsesUsage,
   },
 });
+
+// A content-filter stop is a safety signal the caller must tell apart from a
+// complete or truncated turn, so it surfaces as `inference.safety_rating`.
+// Any other reason (e.g. max_output_tokens) reports usage alone.
+function incompleteReasonEvent(
+  reason: string | undefined,
+  seq: number,
+): InferenceEvent | undefined {
+  if (reason !== "content_filter") return undefined;
+  return {
+    type: "inference.safety_rating",
+    seq,
+    data: { safetyRating: { type: "safety_rating", blockReason: reason } },
+  };
+}
 const ErrorEvent = type({ "message?": "string" });
 
 // Maps the Responses API's usage object onto the internal TokenUsage,
@@ -573,6 +588,11 @@ export function parseResponse(
           parsed,
         );
       }
+      const reasonEvent = incompleteReasonEvent(
+        validated.response.incomplete_details?.reason,
+        seq,
+      );
+      if (reasonEvent !== undefined) events.push(reasonEvent);
       if (validated.response.usage !== undefined) {
         events.push({
           type: "inference.usage",
@@ -844,6 +864,11 @@ export function parseJSONResponse(
     // has nothing to do with; ignored, mirroring the SSE default case.
   }
 
+  const reasonEvent = incompleteReasonEvent(
+    response.incomplete_details?.reason,
+    seq,
+  );
+  if (reasonEvent !== undefined) events.push(reasonEvent);
   events.push({
     type: "inference.usage",
     seq,
