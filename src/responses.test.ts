@@ -620,6 +620,28 @@ describe("Responses parser — non-streaming failure states", () => {
     expect(events.some((e) => e.type === "inference.usage")).toBe(true);
   });
 
+  // OpenAI sends both fields as null on every completed body.
+  test("decodes a completed body with null error and incomplete_details", () => {
+    const adapter = createOpenAIResponsesAdapter(source, {});
+    const completed = JSON.stringify({
+      output: [
+        {
+          type: "message",
+          content: [{ type: "output_text", text: "hello" }],
+        },
+      ],
+      status: "completed",
+      error: null,
+      incomplete_details: null,
+      usage: { input_tokens: 10, output_tokens: 5 },
+    });
+    const events = adapter.parseJSONResponse(completed);
+    expect(events.map((e) => e.type)).toEqual([
+      "inference.text.delta",
+      "inference.usage",
+    ]);
+  });
+
   test("throws on a response missing the required output field", () => {
     const adapter = createOpenAIResponsesAdapter(source, {});
     expect(() =>

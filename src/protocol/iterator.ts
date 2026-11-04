@@ -679,8 +679,8 @@ const CompleteResponse = type({
   "usage?": ResponsesUsage,
   "status?":
     "'completed' | 'failed' | 'incomplete' | 'in_progress' | 'cancelled' | 'queued'",
-  "error?": { "message?": "string" },
-  "incomplete_details?": { "reason?": "string" },
+  "error?": type({ "message?": "string" }).or("null"),
+  "incomplete_details?": type({ "reason?": "string" }).or("null"),
 });
 
 export function parseJSONResponse(
