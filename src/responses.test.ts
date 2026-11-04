@@ -271,6 +271,48 @@ describe("Responses request builder — quirk matrix", () => {
       { type: "output_text", text: "hi" },
     ]);
   });
+
+  const refusalHistory: ConversationTurn[] = [
+    { role: "user", timestamp: 0, content: [{ type: "text", text: "hi" }] },
+    {
+      role: "assistant",
+      timestamp: 0,
+      content: [{ type: "refusal", reason: "I can't help with that." }],
+    },
+    {
+      role: "user",
+      timestamp: 0,
+      content: [{ type: "refusal", reason: "quoted refusal" }],
+    },
+  ];
+
+  test.each([
+    {
+      shape: "typed",
+      assistant: [{ type: "refusal", refusal: "I can't help with that." }],
+      user: [{ type: "input_text", text: "quoted refusal" }],
+    },
+    {
+      shape: "flat",
+      assistant: "I can't help with that.",
+      user: "quoted refusal",
+    },
+  ] as const)(
+    "$shape shape replays a refusal in history instead of throwing",
+    ({ shape, assistant, user }) => {
+      const adapter = createOpenAIResponsesAdapter(source, {
+        contentShape: shape,
+      });
+      const request = adapter.buildRequest(refusalHistory, "model", {});
+      const items = inputItemsOf(request);
+      expect(items[1]).toEqual({
+        type: "message",
+        role: "assistant",
+        content: assistant,
+      });
+      expect(items[2]?.["content"]).toEqual(user);
+    },
+  );
 });
 
 describe("Responses parser — event schema validation", () => {
