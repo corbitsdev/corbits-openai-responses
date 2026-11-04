@@ -26,6 +26,7 @@ const RESPONSES_TOOL_NAME_LIMIT: ToolNameLimit = {
 type ResponsesContentPart =
   | { type: "input_text"; text: string }
   | { type: "output_text"; text: string }
+  | { type: "refusal"; refusal: string }
   | { type: "input_image"; image_url: string }
   | { type: "input_image"; file_id: string }
   | { type: "input_file"; filename: string; file_data: string }
@@ -149,9 +150,11 @@ function toResponsesContentPart(
         `@corbits/openai-responses: adapter does not handle ${block.type} content blocks.`,
       );
     case "refusal":
-      throw new Error(
-        "@corbits/openai-responses: adapter does not handle refusal content blocks.",
-      );
+      // Only a typed assistant message takes output parts; everywhere else
+      // the reason is replayed as plain text.
+      return textKind === "output_text"
+        ? { type: "refusal", refusal: block.reason }
+        : { type: textKind, text: block.reason };
     case "thinking":
     case "tool_call":
     case "tool_result":
